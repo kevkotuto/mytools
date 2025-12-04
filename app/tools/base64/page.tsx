@@ -18,8 +18,9 @@ import {
   AlertCircle,
 } from "lucide-react";
 
-type Mode = "text" | "file" | "image" | "url";
+type Mode = "text" | "file" | "image";
 type Direction = "encode" | "decode";
+type TabType = "options" | "dataurl" | "info";
 
 export default function Base64Page() {
   const [mode, setMode] = useState<Mode>("text");
@@ -37,6 +38,8 @@ export default function Base64Page() {
     size: number;
     dimensions?: { width: number; height: number };
   } | null>(null);
+  const [activeTab, setActiveTab] = useState<TabType>("options");
+  const [mimeType, setMimeType] = useState("text/plain");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -89,7 +92,7 @@ export default function Base64Page() {
         setOutput(decoded);
       }
     } catch {
-      setError(dir === "encode" ? "Erreur lors de l'encodage" : "Base64 invalide - impossible de décoder");
+      setError(dir === "encode" ? "Erreur lors de l'encodage" : "Base64 invalide");
       setOutput("");
     }
   };
@@ -169,20 +172,18 @@ export default function Base64Page() {
   const handleImageDecode = () => {
     if (!output) return;
 
-    // Try to detect if it's a data URL or raw base64
     let dataUrl = output.trim();
 
     if (!dataUrl.startsWith("data:")) {
-      // Try to guess the image type from the base64 header
       const header = atob(dataUrl.slice(0, 16));
-      let mimeType = "image/png";
+      let detectedMime = "image/png";
 
-      if (header.startsWith("\xFF\xD8\xFF")) mimeType = "image/jpeg";
-      else if (header.startsWith("\x89PNG")) mimeType = "image/png";
-      else if (header.startsWith("GIF8")) mimeType = "image/gif";
-      else if (header.startsWith("RIFF") && header.includes("WEBP")) mimeType = "image/webp";
+      if (header.startsWith("\xFF\xD8\xFF")) detectedMime = "image/jpeg";
+      else if (header.startsWith("\x89PNG")) detectedMime = "image/png";
+      else if (header.startsWith("GIF8")) detectedMime = "image/gif";
+      else if (header.startsWith("RIFF") && header.includes("WEBP")) detectedMime = "image/webp";
 
-      dataUrl = `data:${mimeType};base64,${dataUrl}`;
+      dataUrl = `data:${detectedMime};base64,${dataUrl}`;
     }
 
     setPreviewImage(dataUrl);
@@ -190,6 +191,13 @@ export default function Base64Page() {
 
   const copyToClipboard = async () => {
     await navigator.clipboard.writeText(output);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const copyDataUrl = async () => {
+    const dataUrl = `data:${mimeType};base64,${output.replace(/\s/g, "")}`;
+    await navigator.clipboard.writeText(dataUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -234,152 +242,114 @@ export default function Base64Page() {
     return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
   };
 
+  const tabs: { id: TabType; label: string }[] = [
+    { id: "options", label: "Options" },
+    { id: "dataurl", label: "Data URL" },
+    { id: "info", label: "Info" },
+  ];
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="flex h-screen flex-col bg-background">
       {/* Header */}
-      <header className="border-b border-border">
-        <div className="mx-auto max-w-6xl px-4 py-4">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Retour aux outils
-          </Link>
-        </div>
+      <header className="flex h-11 shrink-0 items-center justify-between border-b border-border px-4">
+        <Link
+          href="/"
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Retour
+        </Link>
+        <h1 className="text-sm font-semibold">Base64 Encoder / Decoder</h1>
+        <div className="w-16" />
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">Base64 Encoder / Decoder</h1>
-          <p className="mt-2 text-muted-foreground">
-            Encodez et décodez du texte, des fichiers et des images en Base64.
-          </p>
-        </div>
-
-        {/* Mode & Direction Selection */}
-        <div className="mb-6 flex flex-wrap items-center gap-4">
-          <div className="flex gap-1 rounded-lg border border-border bg-card p-1">
-            <button
-              onClick={() => handleDirectionChange("encode")}
-              className={`flex items-center gap-2 rounded px-4 py-2 text-sm transition-colors ${
-                direction === "encode" ? "bg-primary text-primary-foreground" : "hover:bg-accent"
-              }`}
-            >
-              <Lock className="h-4 w-4" />
-              Encoder
-            </button>
-            <button
-              onClick={() => handleDirectionChange("decode")}
-              className={`flex items-center gap-2 rounded px-4 py-2 text-sm transition-colors ${
-                direction === "decode" ? "bg-primary text-primary-foreground" : "hover:bg-accent"
-              }`}
-            >
-              <Unlock className="h-4 w-4" />
-              Décoder
-            </button>
-          </div>
-
-          <div className="flex gap-1 rounded-lg border border-border bg-card p-1">
-            <button
-              onClick={() => setMode("text")}
-              className={`flex items-center gap-1 rounded px-3 py-1.5 text-sm transition-colors ${
-                mode === "text" ? "bg-secondary" : "hover:bg-accent"
-              }`}
-            >
-              <FileText className="h-4 w-4" />
-              Texte
-            </button>
-            <button
-              onClick={() => setMode("file")}
-              className={`flex items-center gap-1 rounded px-3 py-1.5 text-sm transition-colors ${
-                mode === "file" ? "bg-secondary" : "hover:bg-accent"
-              }`}
-            >
-              <FileCode className="h-4 w-4" />
-              Fichier
-            </button>
-            <button
-              onClick={() => setMode("image")}
-              className={`flex items-center gap-1 rounded px-3 py-1.5 text-sm transition-colors ${
-                mode === "image" ? "bg-secondary" : "hover:bg-accent"
-              }`}
-            >
-              <ImageIcon className="h-4 w-4" />
-              Image
-            </button>
-          </div>
-
-          <div className="flex-1" />
-
-          <button
-            onClick={handleClear}
-            className="flex items-center gap-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm transition-colors hover:bg-accent"
-          >
-            <Trash2 className="h-4 w-4" />
-            Effacer
-          </button>
-        </div>
-
-        {/* Options */}
-        <div className="mb-6 flex flex-wrap items-center gap-4 rounded-lg border border-border bg-card p-4">
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={urlSafe}
-              onChange={(e) => {
-                setUrlSafe(e.target.checked);
-                if (input) processText(input, direction);
-              }}
-              className="h-4 w-4 rounded border-border"
-            />
-            URL-Safe (RFC 4648)
-          </label>
-
-          {direction === "encode" && !urlSafe && (
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={lineBreaks}
-                onChange={(e) => {
-                  setLineBreaks(e.target.checked);
-                  if (input) processText(input, direction);
-                }}
-                className="h-4 w-4 rounded border-border"
-              />
-              Sauts de ligne
-            </label>
-          )}
-
-          {lineBreaks && direction === "encode" && !urlSafe && (
-            <div className="flex items-center gap-2 text-sm">
-              <label>Longueur:</label>
-              <select
-                value={lineLength}
-                onChange={(e) => {
-                  setLineLength(parseInt(e.target.value));
-                  if (input) processText(input, direction);
-                }}
-                className="rounded border border-border bg-background px-2 py-1"
+      <div className="flex flex-1 overflow-hidden">
+        {/* Main Content */}
+        <div className="flex flex-1 flex-col">
+          {/* Top Controls */}
+          <div className="flex items-center gap-3 border-b border-border bg-card px-4 py-2">
+            {/* Direction Toggle */}
+            <div className="flex rounded border border-border bg-background">
+              <button
+                onClick={() => handleDirectionChange("encode")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm ${
+                  direction === "encode" ? "bg-primary/10 font-medium" : "hover:bg-accent"
+                }`}
               >
-                <option value={64}>64</option>
-                <option value={76}>76 (MIME)</option>
-                <option value={80}>80</option>
-              </select>
+                <Lock className="h-3.5 w-3.5" />
+                Encoder
+              </button>
+              <button
+                onClick={() => handleDirectionChange("decode")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm ${
+                  direction === "decode" ? "bg-primary/10 font-medium" : "hover:bg-accent"
+                }`}
+              >
+                <Unlock className="h-3.5 w-3.5" />
+                Décoder
+              </button>
             </div>
-          )}
-        </div>
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Input */}
-          <div className="space-y-4">
-            <div className="rounded-lg border border-border bg-card">
-              <div className="flex items-center justify-between border-b border-border px-4 py-2">
-                <h2 className="text-sm font-medium">
-                  {direction === "encode" ? "Texte à encoder" : "Base64 à décoder"}
-                </h2>
+            {/* Mode Toggle */}
+            <div className="flex rounded border border-border bg-background">
+              <button
+                onClick={() => setMode("text")}
+                className={`flex items-center gap-1 px-2.5 py-1.5 text-sm ${
+                  mode === "text" ? "bg-primary/10 font-medium" : "hover:bg-accent"
+                }`}
+              >
+                <FileText className="h-3.5 w-3.5" />
+                Texte
+              </button>
+              <button
+                onClick={() => setMode("file")}
+                className={`flex items-center gap-1 px-2.5 py-1.5 text-sm ${
+                  mode === "file" ? "bg-primary/10 font-medium" : "hover:bg-accent"
+                }`}
+              >
+                <FileCode className="h-3.5 w-3.5" />
+                Fichier
+              </button>
+              <button
+                onClick={() => setMode("image")}
+                className={`flex items-center gap-1 px-2.5 py-1.5 text-sm ${
+                  mode === "image" ? "bg-primary/10 font-medium" : "hover:bg-accent"
+                }`}
+              >
+                <ImageIcon className="h-3.5 w-3.5" />
+                Image
+              </button>
+            </div>
+
+            <div className="flex-1" />
+
+            <button
+              onClick={handleSwap}
+              className="flex items-center gap-1.5 rounded border border-border bg-background px-2.5 py-1.5 text-sm hover:bg-accent"
+            >
+              <ArrowUpDown className="h-3.5 w-3.5" />
+              Inverser
+            </button>
+
+            <button
+              onClick={handleClear}
+              className="flex items-center gap-1.5 rounded border border-border bg-background px-2.5 py-1.5 text-sm hover:bg-accent"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Effacer
+            </button>
+          </div>
+
+          {/* Editor Area */}
+          <div className="flex flex-1 overflow-hidden">
+            {/* Input Panel */}
+            <div className="flex flex-1 flex-col border-r border-border">
+              <div className="flex items-center justify-between border-b border-border px-3 py-2">
+                <span className="text-xs font-medium text-muted-foreground">
+                  {direction === "encode" ? "Entrée" : "Base64"}
+                </span>
                 <span className="text-xs text-muted-foreground">
-                  {formatBytes(stats.inputSize)} • {stats.inputChars} caractères
+                  {formatBytes(stats.inputSize)}
                 </span>
               </div>
 
@@ -392,12 +362,12 @@ export default function Base64Page() {
                       ? "Entrez le texte à encoder..."
                       : "Collez le Base64 à décoder..."
                   }
-                  className="h-64 w-full resize-none bg-transparent p-4 font-mono text-sm focus:outline-none"
+                  className="flex-1 resize-none bg-transparent p-3 font-mono text-sm focus:outline-none"
                   spellCheck={false}
                 />
               ) : (
                 <div
-                  className="flex h-64 flex-col items-center justify-center gap-4 p-4"
+                  className="flex flex-1 flex-col items-center justify-center gap-3 p-4"
                   onDrop={(e) => {
                     e.preventDefault();
                     const file = e.dataTransfer.files[0];
@@ -412,7 +382,7 @@ export default function Base64Page() {
                 >
                   <Upload className="h-8 w-8 text-muted-foreground" />
                   <p className="text-sm text-muted-foreground">
-                    Glissez un fichier ou cliquez pour sélectionner
+                    Glissez un fichier ou cliquez
                   </p>
                   <input
                     ref={fileInputRef}
@@ -423,233 +393,323 @@ export default function Base64Page() {
                   />
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+                    className="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
                   >
-                    Sélectionner un fichier
+                    Sélectionner
                   </button>
 
                   {input && (
                     <p className="mt-2 text-sm font-medium">{input}</p>
                   )}
+
+                  {previewImage && direction === "encode" && (
+                    <img
+                      src={previewImage}
+                      alt="Source"
+                      className="mt-2 max-h-32 rounded border border-border"
+                    />
+                  )}
                 </div>
               )}
             </div>
 
-            {/* Image Preview (Input) */}
-            {previewImage && direction === "encode" && (
-              <div className="rounded-lg border border-border bg-card p-4">
-                <h3 className="mb-2 text-sm font-medium">Aperçu de l&apos;image source</h3>
-                <img
-                  src={previewImage}
-                  alt="Source"
-                  className="max-h-48 rounded border border-border"
-                />
-                {imageInfo && (
-                  <div className="mt-2 flex gap-4 text-xs text-muted-foreground">
-                    <span>{imageInfo.type}</span>
-                    <span>{formatBytes(imageInfo.size)}</span>
-                    {imageInfo.dimensions && (
-                      <span>{imageInfo.dimensions.width} × {imageInfo.dimensions.height}</span>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Swap Button (Center on Desktop) */}
-          <div className="flex items-center justify-center lg:absolute lg:left-1/2 lg:top-1/2 lg:-translate-x-1/2 lg:hidden">
-            <button
-              onClick={handleSwap}
-              className="rounded-full border border-border bg-card p-2 transition-colors hover:bg-accent"
-            >
-              <ArrowUpDown className="h-4 w-4" />
-            </button>
-          </div>
-
-          {/* Output */}
-          <div className="space-y-4">
-            <div className="rounded-lg border border-border bg-card">
-              <div className="flex items-center justify-between border-b border-border px-4 py-2">
-                <h2 className="text-sm font-medium">
-                  {direction === "encode" ? "Résultat encodé" : "Résultat décodé"}
-                </h2>
-                <div className="flex gap-2">
-                  <button
-                    onClick={copyToClipboard}
-                    disabled={!output}
-                    className="flex items-center gap-1 rounded border border-border bg-background px-2 py-1 text-xs hover:bg-accent disabled:opacity-50"
-                  >
-                    {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
-                    Copier
-                  </button>
-                  <button
-                    onClick={handleDownload}
-                    disabled={!output}
-                    className="flex items-center gap-1 rounded border border-border bg-background px-2 py-1 text-xs hover:bg-accent disabled:opacity-50"
-                  >
-                    <Download className="h-3 w-3" />
-                  </button>
-                </div>
+            {/* Output Panel */}
+            <div className="flex flex-1 flex-col">
+              <div className="flex items-center justify-between border-b border-border px-3 py-2">
+                <span className="text-xs font-medium text-muted-foreground">
+                  {direction === "encode" ? "Base64" : "Sortie"}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {formatBytes(stats.outputSize)}
+                </span>
               </div>
 
-              <div className="relative">
+              <div className="relative flex-1">
                 <textarea
                   value={output}
                   readOnly
                   placeholder="Le résultat apparaîtra ici..."
-                  className="h-64 w-full resize-none bg-transparent p-4 font-mono text-sm focus:outline-none"
+                  className="h-full w-full resize-none bg-transparent p-3 font-mono text-sm focus:outline-none"
                 />
 
                 {error && (
                   <div className="absolute inset-0 flex items-center justify-center bg-background/90">
                     <div className="flex items-center gap-2 text-red-500">
                       <AlertCircle className="h-5 w-5" />
-                      <span>{error}</span>
+                      <span className="text-sm">{error}</span>
                     </div>
                   </div>
                 )}
               </div>
-            </div>
 
-            {/* Image Preview (Output) */}
-            {direction === "decode" && output && mode === "image" && (
-              <div className="rounded-lg border border-border bg-card p-4">
-                <div className="mb-2 flex items-center justify-between">
-                  <h3 className="text-sm font-medium">Aperçu de l&apos;image</h3>
-                  {!previewImage && (
+              {/* Image Preview for Decode */}
+              {direction === "decode" && mode === "image" && output && (
+                <div className="border-t border-border p-3">
+                  {!previewImage ? (
                     <button
                       onClick={handleImageDecode}
-                      className="rounded border border-border bg-background px-2 py-1 text-xs hover:bg-accent"
+                      className="w-full rounded border border-border bg-background px-3 py-2 text-sm hover:bg-accent"
                     >
                       Afficher l&apos;image
                     </button>
+                  ) : (
+                    <img
+                      src={previewImage}
+                      alt="Decoded"
+                      className="max-h-32 rounded border border-border"
+                      onError={() => {
+                        setPreviewImage(null);
+                        setError("Impossible de décoder l'image");
+                      }}
+                    />
                   )}
                 </div>
-                {previewImage ? (
-                  <img
-                    src={previewImage}
-                    alt="Decoded"
-                    className="max-h-48 rounded border border-border"
-                    onError={() => {
-                      setPreviewImage(null);
-                      setError("Impossible de décoder l'image");
-                    }}
-                  />
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Cliquez sur &quot;Afficher l&apos;image&quot; pour voir l&apos;aperçu
-                  </p>
-                )}
-              </div>
-            )}
+              )}
+            </div>
+          </div>
+
+          {/* Bottom Action Bar */}
+          <div className="flex items-center justify-center gap-3 border-t border-border bg-card px-4 py-3">
+            <button
+              onClick={copyToClipboard}
+              disabled={!output}
+              className="flex items-center gap-2 rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+            >
+              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              Copier
+            </button>
+            <button
+              onClick={handleDownload}
+              disabled={!output}
+              className="flex items-center gap-2 rounded border border-border bg-background px-4 py-2 text-sm hover:bg-accent disabled:opacity-50"
+            >
+              <Download className="h-4 w-4" />
+              Télécharger
+            </button>
 
             {/* Stats */}
-            <div className="rounded-lg border border-border bg-card p-4">
-              <h3 className="mb-3 text-sm font-medium">Statistiques</h3>
-              <div className="grid grid-cols-3 gap-4 text-sm">
-                <div>
-                  <p className="text-muted-foreground">Taille entrée</p>
-                  <p className="font-semibold">{formatBytes(stats.inputSize)}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Taille sortie</p>
-                  <p className="font-semibold">{formatBytes(stats.outputSize)}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">
-                    {direction === "encode" ? "Augmentation" : "Réduction"}
-                  </p>
-                  <p className={`font-semibold ${direction === "encode" ? "text-orange-600" : "text-green-600"}`}>
-                    {direction === "encode" ? "+" : ""}{stats.ratio}%
-                  </p>
-                </div>
-              </div>
+            <div className="ml-4 flex items-center gap-4 text-xs text-muted-foreground">
+              <span>
+                {direction === "encode" ? "+" : ""}{stats.ratio}%
+              </span>
             </div>
+          </div>
+        </div>
 
-            {/* Data URL Generator */}
-            {direction === "encode" && output && (
-              <div className="rounded-lg border border-border bg-card p-4">
-                <h3 className="mb-3 text-sm font-medium">Data URL</h3>
-                <div className="space-y-2">
-                  <div className="flex gap-2">
-                    <select
-                      id="mimeType"
-                      className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                      defaultValue="text/plain"
-                    >
-                      <option value="text/plain">text/plain</option>
-                      <option value="text/html">text/html</option>
-                      <option value="text/css">text/css</option>
-                      <option value="text/javascript">text/javascript</option>
-                      <option value="application/json">application/json</option>
-                      <option value="image/png">image/png</option>
-                      <option value="image/jpeg">image/jpeg</option>
-                      <option value="image/gif">image/gif</option>
-                      <option value="image/svg+xml">image/svg+xml</option>
-                    </select>
+        {/* Sidebar */}
+        <div className="flex w-72 shrink-0 flex-col border-l border-border bg-card">
+          {/* Tabs */}
+          <div className="flex border-b border-border">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
+                  activeTab === tab.id
+                    ? "border-b-2 border-primary text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Tab Content */}
+          <div className="flex-1 overflow-y-auto p-4">
+            {activeTab === "options" && (
+              <div className="space-y-4">
+                <div>
+                  <p className="mb-2 text-xs font-medium text-muted-foreground">Format</p>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={urlSafe}
+                      onChange={(e) => {
+                        setUrlSafe(e.target.checked);
+                        if (input) processText(input, direction);
+                      }}
+                      className="h-4 w-4 rounded border-border"
+                    />
+                    URL-Safe (RFC 4648)
+                  </label>
+                </div>
+
+                {direction === "encode" && !urlSafe && (
+                  <div>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={lineBreaks}
+                        onChange={(e) => {
+                          setLineBreaks(e.target.checked);
+                          if (input) processText(input, direction);
+                        }}
+                        className="h-4 w-4 rounded border-border"
+                      />
+                      Sauts de ligne
+                    </label>
+
+                    {lineBreaks && (
+                      <div className="mt-2 flex items-center gap-2 text-sm">
+                        <span className="text-muted-foreground">Longueur:</span>
+                        <select
+                          value={lineLength}
+                          onChange={(e) => {
+                            setLineLength(parseInt(e.target.value));
+                            if (input) processText(input, direction);
+                          }}
+                          className="rounded border border-border bg-background px-2 py-1 text-sm"
+                        >
+                          <option value={64}>64</option>
+                          <option value={76}>76 (MIME)</option>
+                          <option value={80}>80</option>
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Examples */}
+                <div>
+                  <p className="mb-2 text-xs font-medium text-muted-foreground">Exemples</p>
+                  <div className="space-y-1.5">
                     <button
                       onClick={() => {
-                        const select = document.getElementById("mimeType") as HTMLSelectElement;
-                        const dataUrl = `data:${select.value};base64,${output.replace(/\s/g, "")}`;
-                        navigator.clipboard.writeText(dataUrl);
-                        setCopied(true);
-                        setTimeout(() => setCopied(false), 2000);
+                        handleDirectionChange("encode");
+                        setTimeout(() => handleInputChange("Hello, World!"), 0);
                       }}
-                      className="rounded-lg border border-border bg-background px-4 py-2 text-sm transition-colors hover:bg-accent"
+                      className="w-full rounded border border-border bg-background px-3 py-1.5 text-left text-xs hover:bg-accent"
                     >
-                      Copier Data URL
+                      Hello World
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleDirectionChange("decode");
+                        setTimeout(() => handleInputChange("SGVsbG8sIFdvcmxkIQ=="), 0);
+                      }}
+                      className="w-full rounded border border-border bg-background px-3 py-1.5 text-left text-xs hover:bg-accent"
+                    >
+                      SGVsbG8sIFdvcmxkIQ==
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleDirectionChange("encode");
+                        setTimeout(() => handleInputChange("Caractères: é, è, ê, à, ù, ç"), 0);
+                      }}
+                      className="w-full rounded border border-border bg-background px-3 py-1.5 text-left text-xs hover:bg-accent"
+                    >
+                      Caractères UTF-8
                     </button>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Examples */}
-            <div className="rounded-lg border border-border bg-card p-4">
-              <h3 className="mb-3 text-sm font-medium">Exemples</h3>
-              <div className="flex flex-wrap gap-2">
+            {activeTab === "dataurl" && (
+              <div className="space-y-4">
+                <div>
+                  <p className="mb-2 text-xs font-medium text-muted-foreground">Type MIME</p>
+                  <select
+                    value={mimeType}
+                    onChange={(e) => setMimeType(e.target.value)}
+                    className="w-full rounded border border-border bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="text/plain">text/plain</option>
+                    <option value="text/html">text/html</option>
+                    <option value="text/css">text/css</option>
+                    <option value="text/javascript">text/javascript</option>
+                    <option value="application/json">application/json</option>
+                    <option value="image/png">image/png</option>
+                    <option value="image/jpeg">image/jpeg</option>
+                    <option value="image/gif">image/gif</option>
+                    <option value="image/svg+xml">image/svg+xml</option>
+                  </select>
+                </div>
+
                 <button
-                  onClick={() => {
-                    handleDirectionChange("encode");
-                    setTimeout(() => handleInputChange("Hello, World!"), 0);
-                  }}
-                  className="rounded border border-border bg-background px-3 py-1.5 text-xs hover:bg-accent"
+                  onClick={copyDataUrl}
+                  disabled={!output || direction === "decode"}
+                  className="w-full rounded bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
                 >
-                  Hello World
+                  Copier Data URL
                 </button>
-                <button
-                  onClick={() => {
-                    handleDirectionChange("decode");
-                    setTimeout(() => handleInputChange("SGVsbG8sIFdvcmxkIQ=="), 0);
-                  }}
-                  className="rounded border border-border bg-background px-3 py-1.5 text-xs hover:bg-accent"
-                >
-                  SGVsbG8sIFdvcmxkIQ==
-                </button>
-                <button
-                  onClick={() => {
-                    handleDirectionChange("encode");
-                    setTimeout(() => handleInputChange("Les caractères accentués: é, è, ê, à, ù, ç"), 0);
-                  }}
-                  className="rounded border border-border bg-background px-3 py-1.5 text-xs hover:bg-accent"
-                >
-                  Caractères UTF-8
-                </button>
-                <button
-                  onClick={() => {
-                    handleDirectionChange("encode");
-                    setTimeout(() => handleInputChange(JSON.stringify({ name: "Test", value: 123 })), 0);
-                  }}
-                  className="rounded border border-border bg-background px-3 py-1.5 text-xs hover:bg-accent"
-                >
-                  JSON
-                </button>
+
+                {output && direction === "encode" && (
+                  <div className="rounded border border-border bg-background p-3">
+                    <p className="mb-1 text-xs text-muted-foreground">Aperçu:</p>
+                    <code className="break-all text-xs">
+                      data:{mimeType};base64,{output.slice(0, 30)}...
+                    </code>
+                  </div>
+                )}
               </div>
-            </div>
+            )}
+
+            {activeTab === "info" && (
+              <div className="space-y-4 text-xs">
+                <div className="rounded border border-border bg-background p-3">
+                  <p className="font-medium mb-2">Base64</p>
+                  <p className="text-muted-foreground">
+                    Encodage binaire-vers-texte représentant les données en ASCII.
+                    Augmente la taille d&apos;environ 33%.
+                  </p>
+                </div>
+
+                <div className="rounded border border-border bg-background p-3">
+                  <p className="font-medium mb-2">Statistiques</p>
+                  <div className="space-y-1 text-muted-foreground">
+                    <div className="flex justify-between">
+                      <span>Entrée</span>
+                      <span>{formatBytes(stats.inputSize)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Sortie</span>
+                      <span>{formatBytes(stats.outputSize)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Ratio</span>
+                      <span className={direction === "encode" ? "text-orange-500" : "text-green-500"}>
+                        {direction === "encode" ? "+" : ""}{stats.ratio}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded border border-border bg-background p-3">
+                  <p className="font-medium mb-2">URL-Safe</p>
+                  <p className="text-muted-foreground">
+                    Remplace + par -, / par _ et supprime le padding =.
+                    Utilisé pour les URLs et noms de fichiers.
+                  </p>
+                </div>
+
+                {imageInfo && (
+                  <div className="rounded border border-border bg-background p-3">
+                    <p className="font-medium mb-2">Image</p>
+                    <div className="space-y-1 text-muted-foreground">
+                      <div className="flex justify-between">
+                        <span>Type</span>
+                        <span>{imageInfo.type}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Taille</span>
+                        <span>{formatBytes(imageInfo.size)}</span>
+                      </div>
+                      {imageInfo.dimensions && (
+                        <div className="flex justify-between">
+                          <span>Dimensions</span>
+                          <span>{imageInfo.dimensions.width}×{imageInfo.dimensions.height}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

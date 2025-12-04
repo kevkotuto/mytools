@@ -17,8 +17,8 @@ import {
   Box,
   Zap,
   Droplet,
-  ChevronDown,
-  ChevronUp,
+  RotateCw,
+  Activity,
 } from "lucide-react";
 
 type UnitCategory =
@@ -44,7 +44,7 @@ interface Unit {
 
 const categoryLabels: Record<UnitCategory, { name: string; icon: React.ElementType }> = {
   length: { name: "Longueur", icon: Ruler },
-  weight: { name: "Poids / Masse", icon: Scale },
+  weight: { name: "Poids", icon: Scale },
   temperature: { name: "Température", icon: Thermometer },
   time: { name: "Temps", icon: Clock },
   speed: { name: "Vitesse", icon: Gauge },
@@ -53,8 +53,8 @@ const categoryLabels: Record<UnitCategory, { name: string; icon: React.ElementTy
   volume: { name: "Volume", icon: Box },
   energy: { name: "Énergie", icon: Zap },
   pressure: { name: "Pression", icon: Droplet },
-  angle: { name: "Angle", icon: Ruler },
-  frequency: { name: "Fréquence", icon: Zap },
+  angle: { name: "Angle", icon: RotateCw },
+  frequency: { name: "Fréquence", icon: Activity },
 };
 
 const units: Record<UnitCategory, Record<string, Unit>> = {
@@ -200,7 +200,6 @@ export default function UnitConverterPage() {
   const [toUnit, setToUnit] = useState("kilometer");
   const [inputValue, setInputValue] = useState("1");
   const [copied, setCopied] = useState(false);
-  const [expandedCategory, setExpandedCategory] = useState<UnitCategory | null>(null);
 
   const categoryUnits = units[category];
 
@@ -216,7 +215,6 @@ export default function UnitConverterPage() {
     const baseValue = from.toBase(value);
     const convertedValue = to.fromBase(baseValue);
 
-    // Format number
     if (Math.abs(convertedValue) < 0.0001 || Math.abs(convertedValue) > 1e10) {
       return convertedValue.toExponential(6);
     }
@@ -239,7 +237,6 @@ export default function UnitConverterPage() {
     const unitKeys = Object.keys(units[newCategory]);
     setFromUnit(unitKeys[0]);
     setToUnit(unitKeys[1] || unitKeys[0]);
-    setExpandedCategory(null);
   };
 
   // Get all results for this input
@@ -263,292 +260,163 @@ export default function UnitConverterPage() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [inputValue, fromUnit, categoryUnits]);
 
+  const formatValue = (value: number) => {
+    if (Math.abs(value) < 0.0001 || Math.abs(value) > 1e10) {
+      return value.toExponential(4);
+    }
+    return value.toLocaleString("fr-FR", { maximumFractionDigits: 6 });
+  };
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="flex h-screen flex-col bg-background">
       {/* Header */}
-      <header className="border-b border-border">
-        <div className="mx-auto max-w-6xl px-4 py-4">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Retour aux outils
-          </Link>
-        </div>
+      <header className="flex h-11 shrink-0 items-center justify-between border-b border-border px-4">
+        <Link
+          href="/"
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Retour
+        </Link>
+        <h1 className="text-sm font-semibold">Convertisseur d&apos;Unités</h1>
+        <div className="w-16" />
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">Convertisseur d&apos;Unités</h1>
-          <p className="mt-2 text-muted-foreground">
-            Convertissez entre différentes unités de mesure: longueur, poids, température, temps et plus.
-          </p>
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-[300px,1fr]">
-          {/* Categories Sidebar */}
-          <div className="space-y-2">
-            {(Object.keys(categoryLabels) as UnitCategory[]).map((cat) => {
-              const { name, icon: Icon } = categoryLabels[cat];
-              return (
-                <button
-                  key={cat}
-                  onClick={() => handleCategoryChange(cat)}
-                  className={`flex w-full items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${
-                    category === cat
-                      ? "border-primary bg-primary/5 font-medium"
-                      : "border-border bg-card hover:bg-accent"
-                  }`}
-                >
-                  <Icon className="h-5 w-5 text-muted-foreground" />
-                  <span>{name}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Main Converter */}
-          <div className="space-y-6">
-            {/* Converter Card */}
-            <div className="rounded-lg border border-border bg-card p-6">
-              <h2 className="mb-6 text-lg font-semibold">
-                {categoryLabels[category].name}
-              </h2>
-
-              <div className="space-y-4">
-                {/* From */}
-                <div className="grid gap-4 sm:grid-cols-[1fr,auto]">
-                  <div>
-                    <label className="mb-1 block text-xs text-muted-foreground">De</label>
-                    <select
-                      value={fromUnit}
-                      onChange={(e) => setFromUnit(e.target.value)}
-                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
-                    >
-                      {Object.entries(categoryUnits).map(([key, unit]) => (
-                        <option key={key} value={key}>
-                          {unit.name} ({unit.symbol})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs text-muted-foreground">Valeur</label>
-                    <input
-                      type="number"
-                      value={inputValue}
-                      onChange={(e) => setInputValue(e.target.value)}
-                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none sm:w-40"
-                      placeholder="0"
-                    />
-                  </div>
-                </div>
-
-                {/* Swap Button */}
-                <div className="flex justify-center">
-                  <button
-                    onClick={handleSwap}
-                    className="rounded-lg border border-border bg-background p-2 transition-colors hover:bg-accent"
-                  >
-                    <ArrowUpDown className="h-4 w-4" />
-                  </button>
-                </div>
-
-                {/* To */}
-                <div className="grid gap-4 sm:grid-cols-[1fr,auto]">
-                  <div>
-                    <label className="mb-1 block text-xs text-muted-foreground">Vers</label>
-                    <select
-                      value={toUnit}
-                      onChange={(e) => setToUnit(e.target.value)}
-                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
-                    >
-                      {Object.entries(categoryUnits).map(([key, unit]) => (
-                        <option key={key} value={key}>
-                          {unit.name} ({unit.symbol})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs text-muted-foreground">Résultat</label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={result}
-                        readOnly
-                        className="w-full rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm font-medium focus:outline-none sm:w-40"
-                      />
-                      <button
-                        onClick={copyResult}
-                        disabled={!result}
-                        className="rounded-lg border border-border bg-background px-3 py-2 transition-colors hover:bg-accent disabled:opacity-50"
-                      >
-                        {copied ? (
-                          <Check className="h-4 w-4 text-green-500" />
-                        ) : (
-                          <Copy className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Formula Display */}
-                {result && (
-                  <div className="rounded-lg border border-border bg-muted/30 p-4 text-center">
-                    <p className="text-lg">
-                      <span className="font-semibold">{inputValue}</span>{" "}
-                      <span className="text-muted-foreground">{categoryUnits[fromUnit]?.symbol}</span>
-                      <span className="mx-3">=</span>
-                      <span className="font-semibold">{result}</span>{" "}
-                      <span className="text-muted-foreground">{categoryUnits[toUnit]?.symbol}</span>
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* All Conversions */}
-            <div className="rounded-lg border border-border bg-card p-6">
-              <button
-                onClick={() => setExpandedCategory(expandedCategory === category ? null : category)}
-                className="flex w-full items-center justify-between text-left"
+      <div className="flex flex-1 overflow-hidden">
+        {/* Main Content */}
+        <div className="flex flex-1 flex-col">
+          {/* Converter Area */}
+          <div className="flex flex-1 flex-col items-center justify-center gap-6 p-6">
+            {/* From Input */}
+            <div className="flex w-full max-w-md items-center gap-3">
+              <select
+                value={fromUnit}
+                onChange={(e) => setFromUnit(e.target.value)}
+                className="w-40 shrink-0 rounded border border-border bg-card px-3 py-2.5 text-sm focus:border-primary focus:outline-none"
               >
-                <h2 className="text-lg font-semibold">Toutes les conversions</h2>
-                {expandedCategory === category ? (
-                  <ChevronUp className="h-5 w-5 text-muted-foreground" />
-                ) : (
-                  <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                )}
-              </button>
-
-              {expandedCategory === category && (
-                <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {allResults.map(({ key, name, symbol, value }) => {
-                    const displayValue =
-                      Math.abs(value) < 0.0001 || Math.abs(value) > 1e10
-                        ? value.toExponential(4)
-                        : value.toLocaleString("fr-FR", { maximumFractionDigits: 6 });
-
-                    return (
-                      <button
-                        key={key}
-                        onClick={() => {
-                          setToUnit(key);
-                        }}
-                        className={`rounded-lg border p-3 text-left transition-colors ${
-                          toUnit === key
-                            ? "border-primary bg-primary/5"
-                            : "border-border bg-background hover:bg-accent"
-                        }`}
-                      >
-                        <p className="text-sm text-muted-foreground">{name}</p>
-                        <p className="font-medium">
-                          {displayValue} <span className="text-muted-foreground">{symbol}</span>
-                        </p>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+                {Object.entries(categoryUnits).map(([key, unit]) => (
+                  <option key={key} value={key}>
+                    {unit.name} ({unit.symbol})
+                  </option>
+                ))}
+              </select>
+              <input
+                type="number"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                className="flex-1 rounded border border-border bg-card px-4 py-2.5 text-center text-lg font-medium focus:border-primary focus:outline-none"
+                placeholder="0"
+              />
             </div>
 
-            {/* Common Conversions */}
-            <div className="rounded-lg border border-border bg-card p-6">
-              <h2 className="mb-4 text-lg font-semibold">Conversions populaires</h2>
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {category === "length" && (
-                  <>
-                    <QuickConvert from="1 km" to="1000 m" />
-                    <QuickConvert from="1 mi" to="1.609 km" />
-                    <QuickConvert from="1 ft" to="30.48 cm" />
-                    <QuickConvert from="1 in" to="2.54 cm" />
-                    <QuickConvert from="1 m" to="3.281 ft" />
-                    <QuickConvert from="1 yd" to="0.914 m" />
-                  </>
-                )}
-                {category === "weight" && (
-                  <>
-                    <QuickConvert from="1 kg" to="2.205 lb" />
-                    <QuickConvert from="1 lb" to="453.6 g" />
-                    <QuickConvert from="1 oz" to="28.35 g" />
-                    <QuickConvert from="1 t" to="1000 kg" />
-                    <QuickConvert from="1 st" to="6.35 kg" />
-                    <QuickConvert from="1 ct" to="0.2 g" />
-                  </>
-                )}
-                {category === "temperature" && (
-                  <>
-                    <QuickConvert from="0 °C" to="32 °F" />
-                    <QuickConvert from="100 °C" to="212 °F" />
-                    <QuickConvert from="0 °C" to="273.15 K" />
-                    <QuickConvert from="37 °C" to="98.6 °F" />
-                    <QuickConvert from="-40 °C" to="-40 °F" />
-                    <QuickConvert from="20 °C" to="68 °F" />
-                  </>
-                )}
-                {category === "data" && (
-                  <>
-                    <QuickConvert from="1 Go" to="1024 Mo" />
-                    <QuickConvert from="1 To" to="1024 Go" />
-                    <QuickConvert from="1 Mo" to="1024 Ko" />
-                    <QuickConvert from="1 o" to="8 bits" />
-                    <QuickConvert from="1 Gb" to="128 Mo" />
-                    <QuickConvert from="1 Ko" to="1024 o" />
-                  </>
-                )}
-                {category === "time" && (
-                  <>
-                    <QuickConvert from="1 h" to="3600 s" />
-                    <QuickConvert from="1 j" to="24 h" />
-                    <QuickConvert from="1 sem" to="7 j" />
-                    <QuickConvert from="1 an" to="365 j" />
-                    <QuickConvert from="1 min" to="60 s" />
-                    <QuickConvert from="1 mois" to="30 j" />
-                  </>
-                )}
-                {category === "speed" && (
-                  <>
-                    <QuickConvert from="100 km/h" to="62.14 mph" />
-                    <QuickConvert from="1 m/s" to="3.6 km/h" />
-                    <QuickConvert from="1 kn" to="1.852 km/h" />
-                    <QuickConvert from="Mach 1" to="1234.8 km/h" />
-                    <QuickConvert from="1 c" to="299 792 km/s" />
-                    <QuickConvert from="1 ft/s" to="1.097 km/h" />
-                  </>
-                )}
-                {category === "volume" && (
-                  <>
-                    <QuickConvert from="1 L" to="1000 mL" />
-                    <QuickConvert from="1 gal US" to="3.785 L" />
-                    <QuickConvert from="1 m³" to="1000 L" />
-                    <QuickConvert from="1 cup" to="236.6 mL" />
-                    <QuickConvert from="1 tbsp" to="14.79 mL" />
-                    <QuickConvert from="1 tsp" to="4.93 mL" />
-                  </>
-                )}
-                {["area", "energy", "pressure", "angle", "frequency"].includes(category) && (
-                  <p className="text-sm text-muted-foreground col-span-full">
-                    Utilisez le convertisseur ci-dessus pour vos conversions personnalisées.
-                  </p>
-                )}
+            {/* Swap Button */}
+            <button
+              onClick={handleSwap}
+              className="rounded border border-border bg-card p-2 transition-colors hover:bg-accent"
+            >
+              <ArrowUpDown className="h-4 w-4" />
+            </button>
+
+            {/* To Output */}
+            <div className="flex w-full max-w-md items-center gap-3">
+              <select
+                value={toUnit}
+                onChange={(e) => setToUnit(e.target.value)}
+                className="w-40 shrink-0 rounded border border-border bg-card px-3 py-2.5 text-sm focus:border-primary focus:outline-none"
+              >
+                {Object.entries(categoryUnits).map(([key, unit]) => (
+                  <option key={key} value={key}>
+                    {unit.name} ({unit.symbol})
+                  </option>
+                ))}
+              </select>
+              <div className="flex flex-1 items-center gap-2">
+                <input
+                  type="text"
+                  value={result}
+                  readOnly
+                  className="flex-1 rounded border border-border bg-muted/30 px-4 py-2.5 text-center text-lg font-medium"
+                />
+                <button
+                  onClick={copyResult}
+                  disabled={!result}
+                  className="rounded border border-border bg-card p-2.5 transition-colors hover:bg-accent disabled:opacity-50"
+                >
+                  {copied ? (
+                    <Check className="h-4 w-4 text-green-500" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Formula Display */}
+            {result && (
+              <div className="rounded border border-border bg-muted/30 px-6 py-3 text-center">
+                <p className="text-lg">
+                  <span className="font-semibold">{inputValue}</span>{" "}
+                  <span className="text-muted-foreground">{categoryUnits[fromUnit]?.symbol}</span>
+                  <span className="mx-3">=</span>
+                  <span className="font-semibold">{result}</span>{" "}
+                  <span className="text-muted-foreground">{categoryUnits[toUnit]?.symbol}</span>
+                </p>
+              </div>
+            )}
+
+            {/* All Conversions Grid */}
+            <div className="w-full max-w-2xl">
+              <p className="mb-2 text-xs font-medium text-muted-foreground">Toutes les conversions</p>
+              <div className="grid max-h-48 gap-1.5 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
+                {allResults.map(({ key, name, symbol, value }) => (
+                  <button
+                    key={key}
+                    onClick={() => setToUnit(key)}
+                    className={`rounded border px-3 py-2 text-left text-sm transition-colors ${
+                      toUnit === key
+                        ? "border-primary bg-primary/5"
+                        : "border-border bg-card hover:bg-accent"
+                    }`}
+                  >
+                    <span className="text-muted-foreground">{name}</span>
+                    <span className="ml-2 font-medium">
+                      {formatValue(value)} {symbol}
+                    </span>
+                  </button>
+                ))}
               </div>
             </div>
           </div>
         </div>
-      </main>
-    </div>
-  );
-}
 
-function QuickConvert({ from, to }: { from: string; to: string }) {
-  return (
-    <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm">
-      <span className="font-medium">{from}</span>
-      <span className="mx-2 text-muted-foreground">=</span>
-      <span className="font-medium">{to}</span>
+        {/* Categories Sidebar */}
+        <div className="flex w-64 shrink-0 flex-col border-l border-border bg-card">
+          <div className="border-b border-border px-4 py-3">
+            <p className="text-xs font-medium text-muted-foreground">Catégories</p>
+          </div>
+          <div className="flex-1 overflow-y-auto p-2">
+            <div className="grid grid-cols-2 gap-1.5">
+              {(Object.keys(categoryLabels) as UnitCategory[]).map((cat) => {
+                const { name, icon: Icon } = categoryLabels[cat];
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => handleCategoryChange(cat)}
+                    className={`flex flex-col items-center gap-1 rounded border px-2 py-3 text-center transition-colors ${
+                      category === cat
+                        ? "border-primary bg-primary/5 font-medium"
+                        : "border-border bg-background hover:bg-accent"
+                    }`}
+                  >
+                    <Icon className="h-5 w-5 text-muted-foreground" />
+                    <span className="text-xs">{name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

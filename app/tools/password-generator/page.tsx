@@ -12,7 +12,6 @@ import {
   ShieldCheck,
   Eye,
   EyeOff,
-  Trash2,
   Plus,
   Download,
   Lock,
@@ -34,6 +33,7 @@ interface PasswordOptions {
 }
 
 type PasswordStrength = "very-weak" | "weak" | "fair" | "strong" | "very-strong";
+type TabType = "options" | "passphrase" | "bulk";
 
 const defaultOptions: PasswordOptions = {
   length: 16,
@@ -65,45 +65,41 @@ const strengthLabels: Record<PasswordStrength, { label: string; color: string }>
   "very-strong": { label: "Très fort", color: "bg-emerald-500" },
 };
 
+const wordList = [
+  "apple", "brave", "cloud", "dance", "eagle", "flame", "grape", "house", "ivory", "jolly",
+  "knife", "lemon", "maple", "noble", "ocean", "peace", "queen", "river", "storm", "tiger",
+  "ultra", "vivid", "water", "xenon", "yacht", "zebra", "amber", "beach", "chair", "dream",
+  "earth", "frost", "giant", "happy", "image", "judge", "kite", "light", "magic", "night",
+  "orbit", "piano", "quiet", "radar", "smart", "train", "unity", "voice", "world", "young",
+  "alpha", "basic", "candy", "delta", "elite", "focus", "gamma", "heart", "input", "joint",
+  "karma", "lunar", "metal", "north", "oxide", "power", "quest", "royal", "solid", "turbo",
+  "urban", "vital", "white", "extra", "youth", "zonal", "angel", "blank", "coral", "depth",
+  "event", "field", "glass", "honey", "ideal", "juice", "known", "laser", "model", "novel",
+  "olive", "pixel", "quick", "realm", "shell", "tower", "under", "valve", "whale", "xenial",
+];
+
 export default function PasswordGeneratorPage() {
   const [options, setOptions] = useState<PasswordOptions>(defaultOptions);
   const [password, setPassword] = useState("");
   const [passwords, setPasswords] = useState<string[]>([]);
   const [copied, setCopied] = useState<number | null>(null);
   const [showPassword, setShowPassword] = useState(true);
-  const [generateCount, setGenerateCount] = useState(1);
+  const [generateCount, setGenerateCount] = useState(5);
   const [passphrase, setPassphrase] = useState("");
   const [passphraseWords, setPassphraseWords] = useState(4);
   const [passphraseSeparator, setPassphraseSeparator] = useState("-");
   const [passphraseCapitalize, setPassphraseCapitalize] = useState(true);
   const [passphraseNumbers, setPassphraseNumbers] = useState(false);
-
-  const wordList = useMemo(
-    () => [
-      "apple", "brave", "cloud", "dance", "eagle", "flame", "grape", "house", "ivory", "jolly",
-      "knife", "lemon", "maple", "noble", "ocean", "peace", "queen", "river", "storm", "tiger",
-      "ultra", "vivid", "water", "xenon", "yacht", "zebra", "amber", "beach", "chair", "dream",
-      "earth", "frost", "giant", "happy", "image", "judge", "kite", "light", "magic", "night",
-      "orbit", "piano", "quiet", "radar", "smart", "train", "unity", "voice", "world", "young",
-      "alpha", "basic", "candy", "delta", "elite", "focus", "gamma", "heart", "input", "joint",
-      "karma", "lunar", "metal", "north", "oxide", "power", "quest", "royal", "solid", "turbo",
-      "urban", "vital", "white", "extra", "youth", "zonal", "angel", "blank", "coral", "depth",
-      "event", "field", "glass", "honey", "ideal", "juice", "known", "laser", "model", "novel",
-      "olive", "pixel", "quick", "realm", "shell", "tower", "under", "valve", "whale", "xenial",
-    ],
-    []
-  );
+  const [activeTab, setActiveTab] = useState<TabType>("options");
 
   const buildCharset = useCallback(() => {
     let charset = "";
-
     if (options.uppercase) charset += UPPERCASE;
     if (options.lowercase) charset += LOWERCASE;
     if (options.numbers) charset += NUMBERS;
     if (options.symbols) charset += SYMBOLS;
     if (options.includeCustom) charset += options.includeCustom;
 
-    // Remove excluded characters
     if (options.excludeAmbiguous) {
       charset = charset.split("").filter((c) => !AMBIGUOUS.includes(c)).join("");
     }
@@ -114,9 +110,7 @@ export default function PasswordGeneratorPage() {
       charset = charset.split("").filter((c) => !options.customExclude.includes(c)).join("");
     }
 
-    // Remove duplicates
     charset = [...new Set(charset)].join("");
-
     return charset;
   }, [options]);
 
@@ -130,7 +124,6 @@ export default function PasswordGeneratorPage() {
 
     let arrayIndex = 0;
 
-    // Start with letter if required
     if (options.beginWithLetter && (options.uppercase || options.lowercase)) {
       let letters = "";
       if (options.uppercase) letters += UPPERCASE;
@@ -144,17 +137,14 @@ export default function PasswordGeneratorPage() {
     while (result.length < options.length) {
       const char = charset[array[arrayIndex++] % charset.length];
 
-      // Check no consecutive
       if (options.noConsecutive && result.length > 0) {
         if (char === result[result.length - 1]) continue;
       }
 
-      // Check no repeating
       if (options.noRepeating && result.includes(char)) continue;
 
       result += char;
 
-      // Prevent infinite loop
       if (arrayIndex >= array.length) {
         crypto.getRandomValues(array);
         arrayIndex = 0;
@@ -181,55 +171,38 @@ export default function PasswordGeneratorPage() {
     }
 
     return words.join(passphraseSeparator);
-  }, [wordList, passphraseWords, passphraseSeparator, passphraseCapitalize, passphraseNumbers]);
+  }, [passphraseWords, passphraseSeparator, passphraseCapitalize, passphraseNumbers]);
 
-  const calculateStrength = useCallback((pwd: string): { strength: PasswordStrength; score: number; feedback: string[] } => {
-    const feedback: string[] = [];
+  const calculateStrength = useCallback((pwd: string): { strength: PasswordStrength; score: number } => {
     let score = 0;
 
-    // Length scoring
     if (pwd.length >= 8) score += 1;
     if (pwd.length >= 12) score += 1;
     if (pwd.length >= 16) score += 1;
     if (pwd.length >= 20) score += 1;
 
-    // Character type scoring
     if (/[a-z]/.test(pwd)) score += 1;
     if (/[A-Z]/.test(pwd)) score += 1;
     if (/[0-9]/.test(pwd)) score += 1;
     if (/[^a-zA-Z0-9]/.test(pwd)) score += 2;
 
-    // Penalty for common patterns
-    if (/(.)\1{2,}/.test(pwd)) {
-      score -= 1;
-      feedback.push("Évitez les caractères répétés");
-    }
-    if (/^[a-zA-Z]+$/.test(pwd)) {
-      score -= 1;
-      feedback.push("Ajoutez des chiffres ou symboles");
-    }
-    if (/^[0-9]+$/.test(pwd)) {
-      score -= 2;
-      feedback.push("Ajoutez des lettres");
-    }
+    if (/(.)\1{2,}/.test(pwd)) score -= 1;
+    if (/^[a-zA-Z]+$/.test(pwd)) score -= 1;
+    if (/^[0-9]+$/.test(pwd)) score -= 2;
 
-    // Common patterns
     const commonPatterns = ["123", "abc", "qwerty", "password", "admin", "111", "000"];
     for (const pattern of commonPatterns) {
       if (pwd.toLowerCase().includes(pattern)) {
         score -= 2;
-        feedback.push("Évitez les séquences communes");
         break;
       }
     }
 
-    // Calculate entropy bonus
     const charsetSize = buildCharset().length;
     const entropy = pwd.length * Math.log2(charsetSize || 1);
     if (entropy > 60) score += 2;
     else if (entropy > 40) score += 1;
 
-    // Determine strength
     let strength: PasswordStrength;
     if (score <= 2) strength = "very-weak";
     else if (score <= 4) strength = "weak";
@@ -237,12 +210,7 @@ export default function PasswordGeneratorPage() {
     else if (score <= 8) strength = "strong";
     else strength = "very-strong";
 
-    if (pwd.length < 8) feedback.push("Utilisez au moins 8 caractères");
-    if (!/[A-Z]/.test(pwd)) feedback.push("Ajoutez des majuscules");
-    if (!/[0-9]/.test(pwd)) feedback.push("Ajoutez des chiffres");
-    if (!/[^a-zA-Z0-9]/.test(pwd)) feedback.push("Ajoutez des symboles");
-
-    return { strength, score: Math.max(0, Math.min(10, score)), feedback };
+    return { strength, score: Math.max(0, Math.min(10, score)) };
   }, [buildCharset]);
 
   const passwordAnalysis = useMemo(() => {
@@ -251,17 +219,15 @@ export default function PasswordGeneratorPage() {
   }, [password, calculateStrength]);
 
   const handleGenerate = () => {
-    if (generateCount === 1) {
-      setPassword(generatePassword());
-      setPasswords([]);
-    } else {
-      const newPasswords: string[] = [];
-      for (let i = 0; i < generateCount; i++) {
-        newPasswords.push(generatePassword());
-      }
-      setPasswords(newPasswords);
-      setPassword(newPasswords[0] || "");
+    setPassword(generatePassword());
+  };
+
+  const handleGenerateBulk = () => {
+    const newPasswords: string[] = [];
+    for (let i = 0; i < generateCount; i++) {
+      newPasswords.push(generatePassword());
     }
+    setPasswords(newPasswords);
   };
 
   const handleGeneratePassphrase = () => {
@@ -275,7 +241,7 @@ export default function PasswordGeneratorPage() {
   };
 
   const handleDownloadAll = () => {
-    const content = passwords.length > 0 ? passwords.join("\n") : password;
+    const content = passwords.join("\n");
     const blob = new Blob([content], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -285,7 +251,6 @@ export default function PasswordGeneratorPage() {
     URL.revokeObjectURL(url);
   };
 
-  // Generate initial password
   useEffect(() => {
     handleGenerate();
   }, []);
@@ -296,170 +261,206 @@ export default function PasswordGeneratorPage() {
     ? Shield
     : ShieldAlert;
 
+  const applyPreset = (preset: Partial<PasswordOptions>) => {
+    setOptions({ ...defaultOptions, ...preset });
+    setTimeout(handleGenerate, 0);
+  };
+
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border">
-        <div className="mx-auto max-w-6xl px-4 py-4">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Retour aux outils
-          </Link>
-        </div>
+    <div className="flex h-screen flex-col bg-background">
+      {/* Header compact */}
+      <header className="flex h-11 shrink-0 items-center justify-between border-b border-border px-4">
+        <Link
+          href="/"
+          className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Retour
+        </Link>
+        <h1 className="text-sm font-semibold">Générateur de Mot de Passe</h1>
+        <div className="w-16" />
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">Générateur de Mot de Passe</h1>
-          <p className="mt-2 text-muted-foreground">
-            Créez des mots de passe sécurisés et personnalisés ou des phrases secrètes mémorisables.
-          </p>
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-[1fr,400px]">
-          {/* Main Content */}
-          <div className="space-y-6">
-            {/* Password Display */}
-            <div className="rounded-lg border border-border bg-card p-6">
-              <div className="mb-4 flex items-center gap-2">
-                <div className="relative flex-1">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    readOnly
-                    className="w-full rounded-lg border border-border bg-background px-4 py-3 pr-20 font-mono text-lg focus:outline-none"
-                  />
-                  <div className="absolute right-2 top-1/2 flex -translate-y-1/2 gap-1">
-                    <button
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="rounded p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                    <button
-                      onClick={() => copyToClipboard(password)}
-                      className="rounded p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
-                    >
-                      {copied === -1 ? (
-                        <Check className="h-4 w-4 text-green-500" />
-                      ) : (
-                        <Copy className="h-4 w-4" />
-                      )}
-                    </button>
-                  </div>
+      {/* Main content */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Zone principale */}
+        <div className="flex flex-1 flex-col">
+          {/* Password display + strength */}
+          <div className="flex flex-1 flex-col items-center justify-center p-6">
+            <div className="w-full max-w-xl space-y-4">
+              {/* Password field */}
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  readOnly
+                  className="w-full rounded-lg border border-border bg-card px-4 py-4 pr-24 font-mono text-lg focus:outline-none"
+                />
+                <div className="absolute right-2 top-1/2 flex -translate-y-1/2 gap-1">
+                  <button
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="rounded p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                  <button
+                    onClick={() => copyToClipboard(password)}
+                    className="rounded p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
+                  >
+                    {copied === -1 ? (
+                      <Check className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                  </button>
                 </div>
-                <button
-                  onClick={handleGenerate}
-                  className="rounded-lg border border-primary bg-primary px-4 py-3 text-primary-foreground transition-colors hover:opacity-90"
-                >
-                  <RefreshCw className="h-5 w-5" />
-                </button>
               </div>
 
-              {/* Strength Meter */}
+              {/* Strength meter */}
               {passwordAnalysis && (
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
                       <StrengthIcon className={`h-4 w-4 ${strengthLabels[passwordAnalysis.strength].color.replace("bg-", "text-")}`} />
-                      <span className="text-sm font-medium">
-                        {strengthLabels[passwordAnalysis.strength].label}
-                      </span>
+                      <span className="font-medium">{strengthLabels[passwordAnalysis.strength].label}</span>
                     </div>
-                    <span className="text-sm text-muted-foreground">
-                      {passwordAnalysis.score}/10
-                    </span>
+                    <span className="text-muted-foreground">{passwordAnalysis.score}/10</span>
                   </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-muted">
+                  <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                     <div
                       className={`h-full transition-all ${strengthLabels[passwordAnalysis.strength].color}`}
                       style={{ width: `${passwordAnalysis.score * 10}%` }}
                     />
                   </div>
-                  {passwordAnalysis.feedback.length > 0 && (
-                    <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
-                      {passwordAnalysis.feedback.slice(0, 2).map((tip, i) => (
-                        <li key={i}>• {tip}</li>
-                      ))}
-                    </ul>
-                  )}
                 </div>
               )}
-            </div>
 
-            {/* Options */}
-            <div className="rounded-lg border border-border bg-card p-6">
-              <h3 className="mb-4 text-sm font-medium">Options</h3>
-
-              {/* Length */}
-              <div className="mb-6">
-                <div className="mb-2 flex items-center justify-between">
-                  <label className="text-sm">Longueur</label>
-                  <span className="text-sm font-medium">{options.length}</span>
+              {/* Length slider */}
+              <div>
+                <div className="mb-2 flex items-center justify-between text-sm">
+                  <span>Longueur</span>
+                  <span className="font-medium">{options.length}</span>
                 </div>
                 <input
                   type="range"
                   min="4"
-                  max="128"
+                  max="64"
                   value={options.length}
                   onChange={(e) => setOptions({ ...options, length: parseInt(e.target.value) })}
                   className="w-full"
                 />
-                <div className="mt-1 flex justify-between text-xs text-muted-foreground">
-                  <span>4</span>
-                  <span>128</span>
-                </div>
               </div>
 
-              {/* Character Types */}
-              <div className="mb-6 grid grid-cols-2 gap-3">
+              {/* Quick character options */}
+              <div className="flex flex-wrap gap-2">
                 {[
-                  { key: "uppercase", label: "Majuscules (A-Z)" },
-                  { key: "lowercase", label: "Minuscules (a-z)" },
-                  { key: "numbers", label: "Chiffres (0-9)" },
-                  { key: "symbols", label: "Symboles (!@#$...)" },
+                  { key: "uppercase", label: "A-Z" },
+                  { key: "lowercase", label: "a-z" },
+                  { key: "numbers", label: "0-9" },
+                  { key: "symbols", label: "!@#" },
                 ].map(({ key, label }) => (
-                  <label key={key} className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={options[key as keyof PasswordOptions] as boolean}
-                      onChange={(e) =>
-                        setOptions({ ...options, [key]: e.target.checked })
-                      }
-                      className="h-4 w-4 rounded border-border"
-                    />
-                    <span className="text-sm">{label}</span>
-                  </label>
+                  <button
+                    key={key}
+                    onClick={() => setOptions({ ...options, [key]: !options[key as keyof PasswordOptions] })}
+                    className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+                      options[key as keyof PasswordOptions]
+                        ? "border-primary bg-primary/10"
+                        : "border-border hover:bg-accent"
+                    }`}
+                  >
+                    {label}
+                  </button>
                 ))}
               </div>
 
-              {/* Advanced Options */}
-              <div className="space-y-3 border-t border-border pt-4">
-                <h4 className="text-xs font-medium text-muted-foreground">Options avancées</h4>
+              {/* Presets */}
+              <div className="flex flex-wrap gap-2">
                 {[
-                  { key: "excludeAmbiguous", label: "Exclure les caractères ambigus ({}[]()...)" },
-                  { key: "excludeSimilar", label: "Exclure les caractères similaires (il1Lo0O)" },
+                  { label: "Simple", options: { length: 8, symbols: false } },
+                  { label: "Standard", options: { length: 16 } },
+                  { label: "Fort", options: { length: 24 } },
+                  { label: "PIN 4", options: { length: 4, uppercase: false, lowercase: false, symbols: false } },
+                  { label: "PIN 6", options: { length: 6, uppercase: false, lowercase: false, symbols: false } },
+                ].map((preset, i) => (
+                  <button
+                    key={i}
+                    onClick={() => applyPreset(preset.options)}
+                    className="rounded-lg border border-border px-2.5 py-1 text-xs hover:bg-accent"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom action bar */}
+          <div className="flex items-center justify-center gap-3 border-t border-border bg-card px-4 py-3">
+            <button
+              onClick={handleGenerate}
+              className="flex items-center gap-2 rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Générer
+            </button>
+            <button
+              onClick={() => copyToClipboard(password)}
+              className="flex items-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm font-medium hover:bg-accent"
+            >
+              <Copy className="h-4 w-4" />
+              Copier
+            </button>
+          </div>
+        </div>
+
+        {/* Sidebar */}
+        <div className="flex w-80 shrink-0 flex-col border-l border-border bg-card">
+          {/* Tabs */}
+          <div className="flex border-b border-border">
+            {[
+              { id: "options" as TabType, label: "Options" },
+              { id: "passphrase" as TabType, label: "Phrase" },
+              { id: "bulk" as TabType, label: "Masse" },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex-1 py-2.5 text-xs font-medium transition-colors ${
+                  activeTab === tab.id
+                    ? "border-b-2 border-primary text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Tab content */}
+          <div className="flex-1 overflow-y-auto p-4">
+            {activeTab === "options" && (
+              <div className="space-y-4">
+                <p className="text-xs font-medium text-muted-foreground uppercase">Options avancées</p>
+
+                {[
+                  { key: "excludeAmbiguous", label: "Exclure ambigus ({}[]...)" },
+                  { key: "excludeSimilar", label: "Exclure similaires (il1Lo0O)" },
                   { key: "beginWithLetter", label: "Commencer par une lettre" },
-                  { key: "noConsecutive", label: "Pas de caractères consécutifs identiques" },
+                  { key: "noConsecutive", label: "Pas de caractères consécutifs" },
                   { key: "noRepeating", label: "Pas de caractères répétés" },
                 ].map(({ key, label }) => (
                   <label key={key} className="flex items-center gap-2">
                     <input
                       type="checkbox"
                       checked={options[key as keyof PasswordOptions] as boolean}
-                      onChange={(e) =>
-                        setOptions({ ...options, [key]: e.target.checked })
-                      }
-                      className="h-4 w-4 rounded border-border"
+                      onChange={(e) => setOptions({ ...options, [key]: e.target.checked })}
+                      className="rounded border-border"
                     />
-                    <span className="text-sm">{label}</span>
+                    <span className="text-xs">{label}</span>
                   </label>
                 ))}
 
-                <div className="grid grid-cols-2 gap-4 pt-2">
+                <div className="space-y-2 border-t border-border pt-4">
                   <div>
                     <label className="mb-1 block text-xs text-muted-foreground">Exclure</label>
                     <input
@@ -467,7 +468,7 @@ export default function PasswordGeneratorPage() {
                       value={options.customExclude}
                       onChange={(e) => setOptions({ ...options, customExclude: e.target.value })}
                       placeholder="abc..."
-                      className="w-full rounded border border-border bg-background px-2 py-1 text-sm"
+                      className="w-full rounded border border-border bg-background px-2 py-1.5 text-xs"
                     />
                   </div>
                   <div>
@@ -477,115 +478,65 @@ export default function PasswordGeneratorPage() {
                       value={options.includeCustom}
                       onChange={(e) => setOptions({ ...options, includeCustom: e.target.value })}
                       placeholder="€£¥..."
-                      className="w-full rounded border border-border bg-background px-2 py-1 text-sm"
+                      className="w-full rounded border border-border bg-background px-2 py-1.5 text-xs"
                     />
                   </div>
                 </div>
-              </div>
-            </div>
 
-            {/* Bulk Generation */}
-            <div className="rounded-lg border border-border bg-card p-6">
-              <h3 className="mb-4 text-sm font-medium">Génération en masse</h3>
-              <div className="flex items-center gap-4">
+                <div className="border-t border-border pt-4">
+                  <p className="mb-3 text-xs font-medium text-muted-foreground uppercase">Conseils</p>
+                  <ul className="space-y-1.5 text-xs text-muted-foreground">
+                    <li>• Min. 12 caractères</li>
+                    <li>• Mélangez types de caractères</li>
+                    <li>• Un mot de passe unique par compte</li>
+                    <li>• Utilisez un gestionnaire</li>
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "passphrase" && (
+              <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <label className="text-sm">Nombre:</label>
+                  <Lock className="h-4 w-4 text-muted-foreground" />
+                  <p className="text-xs font-medium">Phrase secrète mémorisable</p>
+                </div>
+
+                <div>
                   <input
-                    type="number"
-                    min="1"
-                    max="100"
-                    value={generateCount}
-                    onChange={(e) => setGenerateCount(Math.max(1, Math.min(100, parseInt(e.target.value) || 1)))}
-                    className="w-20 rounded border border-border bg-background px-2 py-1 text-sm"
+                    type="text"
+                    value={passphrase}
+                    readOnly
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs"
+                    placeholder="Cliquez sur Générer"
                   />
                 </div>
-                <button
-                  onClick={handleGenerate}
-                  className="flex items-center gap-2 rounded-lg border border-border bg-background px-4 py-2 text-sm transition-colors hover:bg-accent"
-                >
-                  <Plus className="h-4 w-4" />
-                  Générer
-                </button>
-                {passwords.length > 0 && (
-                  <button
-                    onClick={handleDownloadAll}
-                    className="flex items-center gap-2 rounded-lg border border-border bg-background px-4 py-2 text-sm transition-colors hover:bg-accent"
-                  >
-                    <Download className="h-4 w-4" />
-                    Télécharger
-                  </button>
-                )}
-              </div>
 
-              {passwords.length > 1 && (
-                <div className="mt-4 max-h-48 space-y-2 overflow-auto">
-                  {passwords.map((pwd, i) => (
-                    <div key={i} className="flex items-center gap-2 rounded border border-border bg-background px-3 py-2">
-                      <span className="flex-1 font-mono text-sm">{showPassword ? pwd : "•".repeat(pwd.length)}</span>
-                      <button
-                        onClick={() => copyToClipboard(pwd, i)}
-                        className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-                      >
-                        {copied === i ? (
-                          <Check className="h-3 w-3 text-green-500" />
-                        ) : (
-                          <Copy className="h-3 w-3" />
-                        )}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-4">
-            {/* Passphrase Generator */}
-            <div className="rounded-lg border border-border bg-card p-4">
-              <h3 className="mb-4 flex items-center gap-2 text-sm font-medium">
-                <Lock className="h-4 w-4" />
-                Phrase secrète
-              </h3>
-
-              <div className="mb-4">
-                <input
-                  type="text"
-                  value={passphrase}
-                  readOnly
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 font-mono text-sm"
-                  placeholder="Cliquez sur Générer"
-                />
-              </div>
-
-              <div className="mb-4 space-y-3">
                 <div>
-                  <label className="mb-1 block text-xs text-muted-foreground">Nombre de mots</label>
+                  <div className="mb-1.5 flex items-center justify-between text-xs">
+                    <span>Nombre de mots</span>
+                    <span className="text-muted-foreground">{passphraseWords}</span>
+                  </div>
                   <input
                     type="range"
                     min="3"
-                    max="10"
+                    max="8"
                     value={passphraseWords}
                     onChange={(e) => setPassphraseWords(parseInt(e.target.value))}
                     className="w-full"
                   />
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>3</span>
-                    <span>{passphraseWords}</span>
-                    <span>10</span>
-                  </div>
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-xs text-muted-foreground">Séparateur</label>
-                  <div className="flex gap-2">
+                  <label className="mb-1.5 block text-xs">Séparateur</label>
+                  <div className="flex gap-1.5">
                     {["-", "_", ".", " ", ""].map((sep) => (
                       <button
                         key={sep}
                         onClick={() => setPassphraseSeparator(sep)}
-                        className={`flex-1 rounded border px-2 py-1 text-sm ${
+                        className={`flex-1 rounded border py-1.5 text-xs ${
                           passphraseSeparator === sep
-                            ? "border-primary bg-primary/5"
+                            ? "border-primary bg-primary/10"
                             : "border-border hover:bg-accent"
                         }`}
                       >
@@ -595,85 +546,109 @@ export default function PasswordGeneratorPage() {
                   </div>
                 </div>
 
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={passphraseCapitalize}
-                    onChange={(e) => setPassphraseCapitalize(e.target.checked)}
-                    className="h-4 w-4 rounded border-border"
-                  />
-                  <span className="text-sm">Majuscules</span>
-                </label>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={passphraseCapitalize}
+                      onChange={(e) => setPassphraseCapitalize(e.target.checked)}
+                      className="rounded border-border"
+                    />
+                    <span className="text-xs">Majuscules</span>
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={passphraseNumbers}
+                      onChange={(e) => setPassphraseNumbers(e.target.checked)}
+                      className="rounded border-border"
+                    />
+                    <span className="text-xs">Ajouter chiffres</span>
+                  </label>
+                </div>
 
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={passphraseNumbers}
-                    onChange={(e) => setPassphraseNumbers(e.target.checked)}
-                    className="h-4 w-4 rounded border-border"
-                  />
-                  <span className="text-sm">Ajouter des chiffres</span>
-                </label>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={handleGeneratePassphrase}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Générer
-                </button>
-                <button
-                  onClick={() => copyToClipboard(passphrase)}
-                  disabled={!passphrase}
-                  className="rounded-lg border border-border bg-background px-4 py-2 transition-colors hover:bg-accent disabled:opacity-50"
-                >
-                  <Copy className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Presets */}
-            <div className="rounded-lg border border-border bg-card p-4">
-              <h3 className="mb-3 text-sm font-medium">Préréglages</h3>
-              <div className="space-y-2">
-                {[
-                  { label: "Simple (8 car.)", options: { ...defaultOptions, length: 8, symbols: false } },
-                  { label: "Standard (16 car.)", options: defaultOptions },
-                  { label: "Fort (24 car.)", options: { ...defaultOptions, length: 24 } },
-                  { label: "Maximum (32 car.)", options: { ...defaultOptions, length: 32 } },
-                  { label: "PIN (4 chiffres)", options: { ...defaultOptions, length: 4, uppercase: false, lowercase: false, symbols: false } },
-                  { label: "PIN (6 chiffres)", options: { ...defaultOptions, length: 6, uppercase: false, lowercase: false, symbols: false } },
-                ].map((preset, i) => (
+                <div className="flex gap-2">
                   <button
-                    key={i}
-                    onClick={() => {
-                      setOptions(preset.options);
-                      setTimeout(handleGenerate, 0);
-                    }}
-                    className="w-full rounded border border-border bg-background px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
+                    onClick={handleGeneratePassphrase}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground"
                   >
-                    {preset.label}
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Générer
                   </button>
-                ))}
+                  <button
+                    onClick={() => copyToClipboard(passphrase)}
+                    disabled={!passphrase}
+                    className="rounded-lg border border-border px-3 py-2 hover:bg-accent disabled:opacity-50"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Info */}
-            <div className="rounded-lg border border-border bg-card p-4">
-              <h3 className="mb-3 text-sm font-medium">Conseils de sécurité</h3>
-              <ul className="space-y-2 text-xs text-muted-foreground">
-                <li>• Utilisez au minimum 12 caractères</li>
-                <li>• Mélangez majuscules, minuscules, chiffres et symboles</li>
-                <li>• N&apos;utilisez jamais le même mot de passe deux fois</li>
-                <li>• Utilisez un gestionnaire de mots de passe</li>
-                <li>• Activez l&apos;authentification à deux facteurs</li>
-              </ul>
-            </div>
+            {activeTab === "bulk" && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Plus className="h-4 w-4 text-muted-foreground" />
+                  <p className="text-xs font-medium">Génération en masse</p>
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-xs">Nombre de mots de passe</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="50"
+                    value={generateCount}
+                    onChange={(e) => setGenerateCount(Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))}
+                    className="w-full rounded border border-border bg-background px-3 py-2 text-xs"
+                  />
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleGenerateBulk}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Générer
+                  </button>
+                  {passwords.length > 0 && (
+                    <button
+                      onClick={handleDownloadAll}
+                      className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs hover:bg-accent"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {passwords.length > 0 && (
+                  <div className="max-h-64 space-y-1.5 overflow-auto">
+                    {passwords.map((pwd, i) => (
+                      <div key={i} className="flex items-center gap-2 rounded border border-border bg-background px-2.5 py-1.5">
+                        <span className="flex-1 truncate font-mono text-xs">
+                          {showPassword ? pwd : "•".repeat(Math.min(pwd.length, 20))}
+                        </span>
+                        <button
+                          onClick={() => copyToClipboard(pwd, i)}
+                          className="shrink-0 rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                        >
+                          {copied === i ? (
+                            <Check className="h-3 w-3 text-green-500" />
+                          ) : (
+                            <Copy className="h-3 w-3" />
+                          )}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

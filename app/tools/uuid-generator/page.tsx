@@ -7,9 +7,7 @@ import {
   Copy,
   Check,
   RefreshCw,
-  Trash2,
   Download,
-  Plus,
   Hash,
   Clock,
   Globe,
@@ -19,22 +17,23 @@ import {
 
 type UUIDVersion = "v1" | "v4" | "v7" | "nil" | "max";
 type UUIDFormat = "standard" | "braces" | "urn" | "base64" | "short" | "no-hyphens";
+type TabType = "options" | "validator" | "info";
 
-const versionLabels: Record<UUIDVersion, { name: string; description: string }> = {
-  v1: { name: "UUID v1", description: "Basé sur timestamp + adresse MAC (pseudo)" },
-  v4: { name: "UUID v4", description: "Complètement aléatoire - Le plus utilisé" },
-  v7: { name: "UUID v7", description: "Timestamp Unix ms + random - Triable" },
-  nil: { name: "Nil UUID", description: "UUID vide (tous les bits à 0)" },
-  max: { name: "Max UUID", description: "UUID maximum (tous les bits à 1)" },
+const versionLabels: Record<UUIDVersion, { name: string; description: string; icon: React.ElementType | null }> = {
+  v1: { name: "v1", description: "Timestamp + MAC", icon: Clock },
+  v4: { name: "v4", description: "Aléatoire", icon: Hash },
+  v7: { name: "v7", description: "Unix + random", icon: Globe },
+  nil: { name: "Nil", description: "Tous à 0", icon: null },
+  max: { name: "Max", description: "Tous à 1", icon: null },
 };
 
 const formatLabels: Record<UUIDFormat, { name: string; example: string }> = {
-  standard: { name: "Standard", example: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" },
-  braces: { name: "Accolades", example: "{xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx}" },
-  urn: { name: "URN", example: "urn:uuid:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" },
-  base64: { name: "Base64", example: "AGVmZ2hpamtsbW5vcHE=" },
-  short: { name: "Court (22 car.)", example: "Base64 URL-safe sans padding" },
-  "no-hyphens": { name: "Sans tirets", example: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" },
+  standard: { name: "Standard", example: "8-4-4-4-12" },
+  braces: { name: "{Accolades}", example: "{...}" },
+  urn: { name: "URN", example: "urn:uuid:..." },
+  base64: { name: "Base64", example: "24 car." },
+  short: { name: "Court", example: "22 car." },
+  "no-hyphens": { name: "Sans tirets", example: "32 car." },
 };
 
 export default function UuidGeneratorPage() {
@@ -44,14 +43,14 @@ export default function UuidGeneratorPage() {
   const [count, setCount] = useState(1);
   const [uuids, setUuids] = useState<string[]>([]);
   const [copied, setCopied] = useState<number | null>(null);
+  const [copiedAll, setCopiedAll] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabType>("options");
   const [validateInput, setValidateInput] = useState("");
   const [validationResult, setValidationResult] = useState<{
     valid: boolean;
     version: string;
     variant: string;
   } | null>(null);
-  const [namespace, setNamespace] = useState("6ba7b810-9dad-11d1-80b4-00c04fd430c8"); // DNS namespace
-  const [name, setName] = useState("");
 
   // UUID v1 implementation (pseudo - uses random instead of real MAC)
   const generateUUIDv1 = useCallback(() => {
@@ -77,7 +76,6 @@ export default function UuidGeneratorPage() {
     const array = new Uint8Array(16);
     crypto.getRandomValues(array);
 
-    // Set version (4) and variant (8, 9, a, or b)
     array[6] = (array[6] & 0x0f) | 0x40;
     array[8] = (array[8] & 0x3f) | 0x80;
 
@@ -94,7 +92,6 @@ export default function UuidGeneratorPage() {
     const array = new Uint8Array(10);
     crypto.getRandomValues(array);
 
-    // Build UUID
     const timeLow = timestampHex.slice(0, 8);
     const timeMid = timestampHex.slice(8, 12);
 
@@ -169,13 +166,11 @@ export default function UuidGeneratorPage() {
   const validateUUID = useCallback((input: string) => {
     const trimmed = input.trim().toLowerCase();
 
-    // Remove common prefixes and braces
     let uuid = trimmed
       .replace(/^urn:uuid:/i, "")
       .replace(/^\{/, "")
       .replace(/\}$/, "");
 
-    // Try to parse base64 format
     if (/^[a-zA-Z0-9+/=_-]{22,24}$/.test(uuid)) {
       try {
         const base64 = uuid.replace(/-/g, "+").replace(/_/g, "/");
@@ -187,19 +182,16 @@ export default function UuidGeneratorPage() {
       }
     }
 
-    // Add hyphens if missing
     if (/^[0-9a-f]{32}$/i.test(uuid)) {
       uuid = `${uuid.slice(0, 8)}-${uuid.slice(8, 12)}-${uuid.slice(12, 16)}-${uuid.slice(16, 20)}-${uuid.slice(20)}`;
     }
 
-    // Validate standard format
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
     if (!uuidRegex.test(uuid)) {
       return { valid: false, version: "Invalid", variant: "Invalid" };
     }
 
-    // Extract version
     const versionChar = uuid.charAt(14);
     let versionStr = "Unknown";
     switch (versionChar) {
@@ -219,7 +211,6 @@ export default function UuidGeneratorPage() {
         }
     }
 
-    // Extract variant
     const variantChar = parseInt(uuid.charAt(19), 16);
     let variantStr = "Unknown";
     if ((variantChar & 0x8) === 0) {
@@ -239,10 +230,16 @@ export default function UuidGeneratorPage() {
     setValidationResult(validateUUID(validateInput));
   };
 
-  const copyToClipboard = async (text: string, index?: number) => {
+  const copyToClipboard = async (text: string, index: number) => {
     await navigator.clipboard.writeText(text);
-    setCopied(index ?? -1);
+    setCopied(index);
     setTimeout(() => setCopied(null), 2000);
+  };
+
+  const copyAll = async () => {
+    await navigator.clipboard.writeText(uuids.join("\n"));
+    setCopiedAll(true);
+    setTimeout(() => setCopiedAll(false), 2000);
   };
 
   const handleDownload = () => {
@@ -256,315 +253,319 @@ export default function UuidGeneratorPage() {
     URL.revokeObjectURL(url);
   };
 
-  // Generate initial UUIDs
   useEffect(() => {
     handleGenerate();
   }, []);
 
-  // Regenerate when version or format changes
   useEffect(() => {
     handleGenerate();
   }, [version, format, uppercase]);
 
+  const tabs: { id: TabType; label: string }[] = [
+    { id: "options", label: "Options" },
+    { id: "validator", label: "Validateur" },
+    { id: "info", label: "Info" },
+  ];
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="flex h-screen flex-col bg-background">
       {/* Header */}
-      <header className="border-b border-border">
-        <div className="mx-auto max-w-6xl px-4 py-4">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Retour aux outils
-          </Link>
-        </div>
+      <header className="flex h-11 shrink-0 items-center justify-between border-b border-border px-4">
+        <Link
+          href="/"
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Retour
+        </Link>
+        <h1 className="text-sm font-semibold">Générateur UUID</h1>
+        <div className="w-16" />
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">Générateur UUID / GUID</h1>
-          <p className="mt-2 text-muted-foreground">
-            Générez des identifiants uniques universels (UUID) dans différentes versions et formats.
-          </p>
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-[1fr,400px]">
-          {/* Main Content */}
-          <div className="space-y-6">
-            {/* UUID Display */}
-            <div className="rounded-lg border border-border bg-card p-6">
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-sm font-medium">UUID générés</h2>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => copyToClipboard(uuids.join("\n"))}
-                    className="flex items-center gap-1 rounded border border-border bg-background px-2 py-1 text-xs hover:bg-accent"
-                  >
-                    {copied === -1 ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
-                    Copier tout
-                  </button>
-                  {uuids.length > 1 && (
-                    <button
-                      onClick={handleDownload}
-                      className="flex items-center gap-1 rounded border border-border bg-background px-2 py-1 text-xs hover:bg-accent"
-                    >
-                      <Download className="h-3 w-3" />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                {uuids.map((uuid, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-2 rounded-lg border border-border bg-background px-4 py-3"
-                  >
-                    <code className="flex-1 font-mono text-sm">{uuid}</code>
-                    <button
-                      onClick={() => copyToClipboard(uuid, i)}
-                      className="rounded p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
-                    >
-                      {copied === i ? (
-                        <Check className="h-4 w-4 text-green-500" />
-                      ) : (
-                        <Copy className="h-4 w-4" />
-                      )}
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-4 flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <label className="text-sm">Nombre:</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="100"
-                    value={count}
-                    onChange={(e) => setCount(Math.max(1, Math.min(100, parseInt(e.target.value) || 1)))}
-                    className="w-20 rounded border border-border bg-background px-2 py-1 text-sm"
-                  />
-                </div>
-                <button
-                  onClick={handleGenerate}
-                  className="flex items-center gap-2 rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Générer
-                </button>
-              </div>
-            </div>
-
-            {/* Version Selection */}
-            <div className="rounded-lg border border-border bg-card p-6">
-              <h3 className="mb-4 text-sm font-medium">Version</h3>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-                {(Object.keys(versionLabels) as UUIDVersion[]).map((v) => (
+      <div className="flex flex-1 overflow-hidden">
+        {/* Main Content */}
+        <div className="flex flex-1 flex-col">
+          {/* UUID Display Area */}
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6">
+            {/* Version Quick Select */}
+            <div className="flex gap-2">
+              {(Object.keys(versionLabels) as UUIDVersion[]).map((v) => {
+                const { name, icon: Icon } = versionLabels[v];
+                return (
                   <button
                     key={v}
                     onClick={() => setVersion(v)}
-                    className={`flex flex-col items-center rounded-lg border p-3 transition-colors ${
+                    className={`flex items-center gap-1.5 rounded border px-3 py-1.5 text-sm transition-colors ${
                       version === v
-                        ? "border-primary bg-primary/5"
-                        : "border-border hover:bg-accent"
+                        ? "border-primary bg-primary/5 font-medium"
+                        : "border-border bg-card hover:bg-accent"
                     }`}
                   >
-                    <span className="text-sm font-medium">{versionLabels[v].name}</span>
-                    <span className="mt-1 text-center text-xs text-muted-foreground">
-                      {v === "v1" && <Clock className="inline h-3 w-3 mr-1" />}
-                      {v === "v4" && <Hash className="inline h-3 w-3 mr-1" />}
-                      {v === "v7" && <Globe className="inline h-3 w-3 mr-1" />}
-                    </span>
+                    {Icon && <Icon className="h-3.5 w-3.5" />}
+                    {name}
                   </button>
-                ))}
-              </div>
-              <p className="mt-3 text-xs text-muted-foreground">
-                {versionLabels[version].description}
-              </p>
+                );
+              })}
             </div>
 
-            {/* Format Selection */}
-            <div className="rounded-lg border border-border bg-card p-6">
-              <h3 className="mb-4 text-sm font-medium">Format</h3>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {(Object.keys(formatLabels) as UUIDFormat[]).map((f) => (
+            {/* UUIDs List */}
+            <div className="w-full max-w-xl space-y-2">
+              {uuids.map((uuid, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-2 rounded border border-border bg-card px-4 py-3"
+                >
+                  <code className="flex-1 text-center font-mono text-sm">{uuid}</code>
                   <button
-                    key={f}
-                    onClick={() => setFormat(f)}
-                    className={`rounded-lg border p-3 text-left transition-colors ${
-                      format === f
-                        ? "border-primary bg-primary/5"
-                        : "border-border hover:bg-accent"
+                    onClick={() => copyToClipboard(uuid, i)}
+                    className="rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                  >
+                    {copied === i ? (
+                      <Check className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Count Selector */}
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-muted-foreground">Nombre:</span>
+              <div className="flex items-center rounded border border-border bg-card">
+                {[1, 5, 10, 25].map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => setCount(n)}
+                    className={`px-3 py-1.5 text-sm ${
+                      count === n
+                        ? "bg-primary/10 font-medium"
+                        : "hover:bg-accent"
                     }`}
                   >
-                    <span className="block text-sm font-medium">{formatLabels[f].name}</span>
-                    <span className="block truncate text-xs text-muted-foreground">
-                      {formatLabels[f].example}
-                    </span>
+                    {n}
                   </button>
                 ))}
               </div>
-
-              <label className="mt-4 flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={uppercase}
-                  onChange={(e) => setUppercase(e.target.checked)}
-                  className="h-4 w-4 rounded border-border"
-                />
-                <span className="text-sm">MAJUSCULES</span>
-              </label>
+              <input
+                type="number"
+                min="1"
+                max="100"
+                value={count}
+                onChange={(e) => setCount(Math.max(1, Math.min(100, parseInt(e.target.value) || 1)))}
+                className="w-16 rounded border border-border bg-card px-2 py-1.5 text-center text-sm focus:border-primary focus:outline-none"
+              />
             </div>
+          </div>
 
-            {/* Validator */}
-            <div className="rounded-lg border border-border bg-card p-6">
-              <h3 className="mb-4 text-sm font-medium">Validateur UUID</h3>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={validateInput}
-                  onChange={(e) => {
-                    setValidateInput(e.target.value);
-                    setValidationResult(null);
-                  }}
-                  placeholder="Collez un UUID à valider..."
-                  className="flex-1 rounded-lg border border-border bg-background px-3 py-2 font-mono text-sm focus:border-primary focus:outline-none"
-                />
+          {/* Bottom Action Bar */}
+          <div className="flex items-center justify-center gap-3 border-t border-border bg-card px-4 py-3">
+            <button
+              onClick={handleGenerate}
+              className="flex items-center gap-2 rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Générer
+            </button>
+            <button
+              onClick={copyAll}
+              className="flex items-center gap-2 rounded border border-border bg-background px-4 py-2 text-sm hover:bg-accent"
+            >
+              {copiedAll ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+              Copier tout
+            </button>
+            {uuids.length > 1 && (
+              <button
+                onClick={handleDownload}
+                className="flex items-center gap-2 rounded border border-border bg-background px-4 py-2 text-sm hover:bg-accent"
+              >
+                <Download className="h-4 w-4" />
+                Télécharger
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Sidebar */}
+        <div className="flex w-80 shrink-0 flex-col border-l border-border bg-card">
+          {/* Tabs */}
+          <div className="flex border-b border-border">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
+                  activeTab === tab.id
+                    ? "border-b-2 border-primary text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Tab Content */}
+          <div className="flex-1 overflow-y-auto p-4">
+            {activeTab === "options" && (
+              <div className="space-y-4">
+                {/* Format */}
+                <div>
+                  <p className="mb-2 text-xs font-medium text-muted-foreground">Format</p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {(Object.keys(formatLabels) as UUIDFormat[]).map((f) => (
+                      <button
+                        key={f}
+                        onClick={() => setFormat(f)}
+                        className={`rounded border px-2 py-2 text-left text-xs transition-colors ${
+                          format === f
+                            ? "border-primary bg-primary/5"
+                            : "border-border bg-background hover:bg-accent"
+                        }`}
+                      >
+                        <span className="block font-medium">{formatLabels[f].name}</span>
+                        <span className="text-muted-foreground">{formatLabels[f].example}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Uppercase */}
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={uppercase}
+                    onChange={(e) => setUppercase(e.target.checked)}
+                    className="h-4 w-4 rounded border-border"
+                  />
+                  <span className="text-sm">MAJUSCULES</span>
+                </label>
+
+                {/* Version Details */}
+                <div>
+                  <p className="mb-2 text-xs font-medium text-muted-foreground">Description</p>
+                  <div className="rounded border border-border bg-background p-3 text-xs">
+                    <p className="font-medium">{versionLabels[version].name}</p>
+                    <p className="mt-1 text-muted-foreground">{versionLabels[version].description}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "validator" && (
+              <div className="space-y-4">
+                <div>
+                  <p className="mb-2 text-xs font-medium text-muted-foreground">UUID à valider</p>
+                  <input
+                    type="text"
+                    value={validateInput}
+                    onChange={(e) => {
+                      setValidateInput(e.target.value);
+                      setValidationResult(null);
+                    }}
+                    placeholder="Collez un UUID..."
+                    className="w-full rounded border border-border bg-background px-3 py-2 font-mono text-xs focus:border-primary focus:outline-none"
+                  />
+                </div>
+
                 <button
                   onClick={handleValidate}
                   disabled={!validateInput.trim()}
-                  className="rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+                  className="w-full rounded bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
                 >
                   Valider
                 </button>
-              </div>
 
-              {validationResult && (
-                <div
-                  className={`mt-4 rounded-lg border p-4 ${
-                    validationResult.valid
-                      ? "border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950"
-                      : "border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950"
-                  }`}
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    {validationResult.valid ? (
-                      <CheckCircle className="h-5 w-5 text-green-500" />
-                    ) : (
-                      <XCircle className="h-5 w-5 text-red-500" />
-                    )}
-                    <span className={`font-medium ${validationResult.valid ? "text-green-700 dark:text-green-300" : "text-red-700 dark:text-red-300"}`}>
-                      {validationResult.valid ? "UUID valide" : "UUID invalide"}
-                    </span>
-                  </div>
-                  {validationResult.valid && (
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">Version:</span>{" "}
-                        <span className="font-medium">{validationResult.version}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Variant:</span>{" "}
-                        <span className="font-medium">{validationResult.variant}</span>
-                      </div>
+                {validationResult && (
+                  <div
+                    className={`rounded border p-3 ${
+                      validationResult.valid
+                        ? "border-green-500/30 bg-green-500/5"
+                        : "border-red-500/30 bg-red-500/5"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      {validationResult.valid ? (
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-red-500" />
+                      )}
+                      <span className={`text-sm font-medium ${validationResult.valid ? "text-green-600" : "text-red-600"}`}>
+                        {validationResult.valid ? "UUID valide" : "UUID invalide"}
+                      </span>
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
+                    {validationResult.valid && (
+                      <div className="space-y-1 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Version</span>
+                          <span className="font-medium">{validationResult.version}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Variant</span>
+                          <span className="font-medium">{validationResult.variant}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
-          {/* Sidebar */}
-          <div className="space-y-4">
-            {/* Quick Info */}
-            <div className="rounded-lg border border-border bg-card p-4">
-              <h3 className="mb-3 text-sm font-medium">Informations</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Longueur</span>
-                  <span className="font-medium">128 bits (16 octets)</span>
+            {activeTab === "info" && (
+              <div className="space-y-4 text-xs">
+                <div className="rounded border border-border bg-background p-3">
+                  <p className="font-medium mb-2">Structure UUID</p>
+                  <div className="space-y-1 text-muted-foreground">
+                    <div className="flex justify-between">
+                      <span>Longueur</span>
+                      <span>128 bits (16 octets)</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Format</span>
+                      <span>8-4-4-4-12</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Caractères</span>
+                      <span>36 (32 hex + 4 tirets)</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Combinaisons v4</span>
+                      <span>~5.3×10³⁶</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Format</span>
-                  <span className="font-medium">8-4-4-4-12</span>
+
+                <div className="rounded border border-border bg-background p-3">
+                  <p className="font-medium mb-2">Versions</p>
+                  <div className="space-y-2 text-muted-foreground">
+                    <div>
+                      <span className="text-foreground">v1:</span> Timestamp + MAC
+                    </div>
+                    <div>
+                      <span className="text-foreground">v4:</span> Aléatoire (recommandé)
+                    </div>
+                    <div>
+                      <span className="text-foreground">v7:</span> Unix timestamp + random
+                    </div>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Caractères</span>
-                  <span className="font-medium">36 (32 hex + 4 tirets)</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Combinaisons v4</span>
-                  <span className="font-medium">~5.3×10³⁶</span>
+
+                <div className="rounded border border-border bg-background p-3">
+                  <p className="font-medium mb-2">Cas d&apos;usage</p>
+                  <ul className="space-y-1 text-muted-foreground">
+                    <li>• Identifiants BDD</li>
+                    <li>• Clés de session</li>
+                    <li>• Tokens API</li>
+                    <li>• Noms de fichiers</li>
+                    <li>• IDs de transactions</li>
+                  </ul>
                 </div>
               </div>
-            </div>
-
-            {/* Version Details */}
-            <div className="rounded-lg border border-border bg-card p-4">
-              <h3 className="mb-3 text-sm font-medium">Détails des versions</h3>
-              <div className="space-y-3 text-xs">
-                <div className="rounded border border-border p-2">
-                  <p className="font-medium">UUID v1</p>
-                  <p className="text-muted-foreground">
-                    Basé sur timestamp et adresse MAC. Peut révéler des infos sur l&apos;hôte.
-                  </p>
-                </div>
-                <div className="rounded border border-primary/50 bg-primary/5 p-2">
-                  <p className="font-medium">UUID v4 (recommandé)</p>
-                  <p className="text-muted-foreground">
-                    122 bits aléatoires. Le plus utilisé car totalement imprévisible.
-                  </p>
-                </div>
-                <div className="rounded border border-border p-2">
-                  <p className="font-medium">UUID v7</p>
-                  <p className="text-muted-foreground">
-                    Timestamp Unix + random. Triable chronologiquement, idéal pour les BDD.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Use Cases */}
-            <div className="rounded-lg border border-border bg-card p-4">
-              <h3 className="mb-3 text-sm font-medium">Cas d&apos;usage</h3>
-              <ul className="space-y-2 text-xs text-muted-foreground">
-                <li>• Identifiants de base de données</li>
-                <li>• Clés de session utilisateur</li>
-                <li>• Identifiants d&apos;API / tokens</li>
-                <li>• Noms de fichiers uniques</li>
-                <li>• Tracking d&apos;événements</li>
-                <li>• Identifiants de transactions</li>
-              </ul>
-            </div>
-
-            {/* Comparison */}
-            <div className="rounded-lg border border-border bg-card p-4">
-              <h3 className="mb-3 text-sm font-medium">UUID vs autres</h3>
-              <div className="space-y-2 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">UUID</span>
-                  <span className="font-mono">128 bits</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">ULID</span>
-                  <span className="font-mono">128 bits (triable)</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">NanoID</span>
-                  <span className="font-mono">126 bits (21 car.)</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">ObjectId</span>
-                  <span className="font-mono">96 bits (MongoDB)</span>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

@@ -15,13 +15,42 @@ import {
   ShieldCheck,
   Palette,
   Image,
+  ImageIcon,
   Scale,
   Binary,
   Braces,
   Type,
+  AppWindow,
+  Shapes,
+  Eraser,
+  FileStack,
+  FileSpreadsheet,
+  FolderArchive,
+  FileArchive,
+  Workflow,
+  Lock,
+  Key,
+  Shield,
+  Clock,
+  GitCompare,
+  Minimize2,
+  Scissors,
+  Film,
+  Crop,
+  Code,
+  Timer,
+  Columns,
+  Receipt,
+  PenTool,
+  CalendarDays,
+  Home,
+  Percent,
+  Globe,
+  Star,
 } from "lucide-react";
 import { tools } from "@/config/tools";
 import { categoryLabels, type ToolCategory } from "@/types/tool";
+import { useFavorites } from "@/hooks/useFavorites";
 
 const iconMap: Record<string, React.ElementType> = {
   QrCode,
@@ -31,14 +60,44 @@ const iconMap: Record<string, React.ElementType> = {
   ShieldCheck,
   Palette,
   Image,
+  ImageIcon,
   Scale,
   Binary,
   Braces,
   Type,
+  AppWindow,
+  Shapes,
+  Eraser,
+  FileStack,
+  FileSpreadsheet,
+  FolderArchive,
+  FileArchive,
+  Workflow,
+  Lock,
+  Key,
+  Shield,
+  Clock,
+  GitCompare,
+  Minimize2,
+  Search,
+  Sparkles,
+  Scissors,
+  Film,
+  Crop,
+  Code,
+  Timer,
+  Columns,
+  Receipt,
+  PenTool,
+  CalendarDays,
+  Home,
+  Percent,
+  Globe,
 };
 
 export default function ToolsGrid() {
   const [searchQuery, setSearchQuery] = useState("");
+  const { favorites, isLoaded, toggleFavorite, isFavorite } = useFavorites();
 
   const filteredTools = useMemo(() => {
     if (!searchQuery.trim()) return tools;
@@ -51,6 +110,10 @@ export default function ToolsGrid() {
         categoryLabels[tool.category].toLowerCase().includes(query)
     );
   }, [searchQuery]);
+
+  const favoriteTools = useMemo(() => {
+    return tools.filter((tool) => favorites.includes(tool.id));
+  }, [favorites]);
 
   const groupedTools = useMemo(() => {
     return filteredTools.reduce(
@@ -69,6 +132,36 @@ export default function ToolsGrid() {
 
   return (
     <>
+      {/* Favorites Bar */}
+      {isLoaded && favoriteTools.length > 0 && (
+        <div className="border-b border-border bg-muted/20">
+          <div className="mx-auto max-w-6xl px-4 py-4">
+            <div className="flex items-center gap-3">
+              <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
+              <span className="text-sm font-medium text-muted-foreground">
+                Favoris
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {favoriteTools.map((tool) => {
+                  const Icon = iconMap[tool.icon] || QrCode;
+                  return (
+                    <Link
+                      key={tool.id}
+                      href={tool.href}
+                      className="group flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 transition-colors hover:border-primary/50 hover:bg-accent/50"
+                      title={tool.name}
+                    >
+                      <Icon className="h-4 w-4 text-foreground" />
+                      <span className="text-sm font-medium">{tool.name}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Search Bar */}
       <div className="mx-auto max-w-6xl px-4 py-8">
         <div className="relative max-w-md">
@@ -108,14 +201,37 @@ export default function ToolsGrid() {
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {categoryTools.map((tool) => {
                   const Icon = iconMap[tool.icon] || QrCode;
+                  const toolIsFavorite = isFavorite(tool.id);
                   return (
-                    <Link
+                    <div
                       key={tool.id}
-                      href={tool.href}
                       className="group relative rounded-lg border border-border bg-card p-6 transition-colors hover:border-primary/50 hover:bg-accent/50"
                     >
+                      {/* Favorite Button */}
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          toggleFavorite(tool.id);
+                        }}
+                        className="absolute right-4 top-4 z-10 rounded-md p-1.5 transition-colors hover:bg-secondary"
+                        title={
+                          toolIsFavorite
+                            ? "Retirer des favoris"
+                            : "Ajouter aux favoris"
+                        }
+                      >
+                        <Star
+                          className={`h-4 w-4 transition-colors ${
+                            toolIsFavorite
+                              ? "text-amber-500 fill-amber-500"
+                              : "text-muted-foreground hover:text-amber-500"
+                          }`}
+                        />
+                      </button>
+
                       {/* Badges */}
-                      <div className="absolute right-4 top-4 flex gap-2">
+                      <div className="absolute right-12 top-4 flex gap-2">
                         {tool.isNew && (
                           <span className="flex items-center gap-1 rounded-full bg-chart-1/10 px-2 py-0.5 text-xs font-medium text-chart-1">
                             <Sparkles className="h-3 w-3" />
@@ -130,23 +246,27 @@ export default function ToolsGrid() {
                         )}
                       </div>
 
-                      {/* Icon */}
-                      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-secondary">
-                        <Icon className="h-6 w-6 text-foreground" />
-                      </div>
+                      <Link href={tool.href} className="block">
+                        {/* Icon */}
+                        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-secondary">
+                          <Icon className="h-6 w-6 text-foreground" />
+                        </div>
 
-                      {/* Content */}
-                      <h3 className="mb-2 text-lg font-semibold">{tool.name}</h3>
-                      <p className="mb-4 text-sm text-muted-foreground line-clamp-2">
-                        {tool.description}
-                      </p>
+                        {/* Content */}
+                        <h3 className="mb-2 text-lg font-semibold">
+                          {tool.name}
+                        </h3>
+                        <p className="mb-4 text-sm text-muted-foreground line-clamp-2">
+                          {tool.description}
+                        </p>
 
-                      {/* CTA */}
-                      <div className="flex items-center text-sm font-medium text-primary group-hover:underline">
-                        Utiliser l&apos;outil
-                        <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
-                      </div>
-                    </Link>
+                        {/* CTA */}
+                        <div className="flex items-center text-sm font-medium text-primary group-hover:underline">
+                          Utiliser l&apos;outil
+                          <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                        </div>
+                      </Link>
+                    </div>
                   );
                 })}
               </div>

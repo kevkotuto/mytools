@@ -8,8 +8,6 @@ import {
   Upload,
   X,
   RefreshCw,
-  ChevronDown,
-  ChevronUp,
   Copy,
   Check,
 } from "lucide-react";
@@ -42,6 +40,8 @@ import {
   getContentPlaceholder,
 } from "@/lib/qr-utils";
 
+type TabType = "content" | "style" | "advanced";
+
 export default function QRGeneratorPage() {
   const [config, setConfig] = useState<QRConfig>(defaultConfig);
   const [vcardData, setVcardData] = useState<VCardData>({
@@ -72,20 +72,9 @@ export default function QRGeneratorPage() {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
   const [copied, setCopied] = useState(false);
-  const [expandedSections, setExpandedSections] = useState({
-    colors: true,
-    dots: false,
-    corners: false,
-    logo: false,
-    frame: false,
-    advanced: false,
-  });
+  const [activeTab, setActiveTab] = useState<TabType>("content");
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const toggleSection = (section: keyof typeof expandedSections) => {
-    setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
-  };
 
   const getFinalContent = useCallback((): string => {
     switch (config.contentType) {
@@ -110,21 +99,6 @@ export default function QRGeneratorPage() {
       (row < 7 && col >= moduleCount - 7) ||
       (row >= moduleCount - 7 && col < 7)
     );
-  };
-
-  const isCornerDot = (row: number, col: number, moduleCount: number): boolean => {
-    const positions = [
-      { r: 2, c: 2 }, { r: 3, c: 2 }, { r: 4, c: 2 },
-      { r: 2, c: 3 }, { r: 3, c: 3 }, { r: 4, c: 3 },
-      { r: 2, c: 4 }, { r: 3, c: 4 }, { r: 4, c: 4 },
-    ];
-
-    for (const pos of positions) {
-      if (row === pos.r && col === pos.c) return true;
-      if (row === pos.r && col === moduleCount - 7 + pos.c) return true;
-      if (row === moduleCount - 7 + pos.r && col === pos.c) return true;
-    }
-    return false;
   };
 
   const drawDot = (
@@ -211,8 +185,6 @@ export default function QRGeneratorPage() {
     style: QRCornerSquareStyle
   ) => {
     const outerSize = size * 7;
-    const innerSize = size * 3;
-    const innerOffset = size * 2;
 
     ctx.save();
 
@@ -238,7 +210,6 @@ export default function QRGeneratorPage() {
         ctx.globalCompositeOperation = "destination-out";
         ctx.fillRect(x + size, y + size, outerSize - size * 2, outerSize - size * 2);
         ctx.globalCompositeOperation = "source-over";
-        // Inner square corners
         ctx.fillRect(x, y, size * 2, size);
         ctx.fillRect(x, y, size, size * 2);
         break;
@@ -311,7 +282,6 @@ export default function QRGeneratorPage() {
       canvas.width = actualWidth;
       canvas.height = actualHeight;
 
-      // Background
       if (config.transparentBackground) {
         ctx.clearRect(0, 0, actualWidth, actualHeight);
       } else {
@@ -319,7 +289,6 @@ export default function QRGeneratorPage() {
         ctx.fillRect(0, 0, actualWidth, actualHeight);
       }
 
-      // Frame
       if (config.showFrame) {
         ctx.fillStyle = config.frameColor;
         ctx.fillRect(0, actualHeight - frameHeight, actualWidth, frameHeight);
@@ -332,7 +301,6 @@ export default function QRGeneratorPage() {
 
       const offset = config.margin;
 
-      // Create gradient if needed
       let fillStyle: string | CanvasGradient = config.foregroundColor;
       if (config.useGradient) {
         if (config.gradientType === "linear") {
@@ -356,7 +324,6 @@ export default function QRGeneratorPage() {
         }
       }
 
-      // Draw corner squares first
       const cornerPositions = [
         { x: offset, y: offset },
         { x: offset + (moduleCount - 7) * cellSize, y: offset },
@@ -371,7 +338,6 @@ export default function QRGeneratorPage() {
         drawCornerDot(ctx, pos.x + cellSize * 2, pos.y + cellSize * 2, cellSize, config.cornerDotStyle);
       }
 
-      // Draw regular modules (excluding corners)
       ctx.fillStyle = fillStyle;
       for (let row = 0; row < moduleCount; row++) {
         for (let col = 0; col < moduleCount; col++) {
@@ -383,7 +349,6 @@ export default function QRGeneratorPage() {
         }
       }
 
-      // Draw logo if present
       if (config.logo) {
         const img = new Image();
         img.onload = () => {
@@ -391,7 +356,6 @@ export default function QRGeneratorPage() {
           const logoX = (actualWidth - logoSize) / 2;
           const logoY = (qrSize + config.margin * 2 - logoSize) / 2;
 
-          // Logo background
           if (!config.transparentBackground) {
             ctx.fillStyle = config.backgroundColor;
             const bgPadding = config.logoMargin;
@@ -414,7 +378,6 @@ export default function QRGeneratorPage() {
             }
           }
 
-          // Clip for rounded logo
           if (config.logoBorderRadius > 0) {
             ctx.save();
             ctx.beginPath();
@@ -586,7 +549,6 @@ export default function QRGeneratorPage() {
 
       let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`;
 
-      // Gradient definition if needed
       if (config.useGradient) {
         if (config.gradientType === "linear") {
           const angle = config.gradientRotation;
@@ -607,12 +569,10 @@ export default function QRGeneratorPage() {
         }
       }
 
-      // Background
       if (!config.transparentBackground) {
         svgContent += `<rect width="100%" height="${width}" fill="${config.backgroundColor}"/>`;
       }
 
-      // Frame
       if (config.showFrame) {
         svgContent += `<rect x="0" y="${width}" width="${width}" height="${frameHeight}" fill="${config.frameColor}"/>`;
         svgContent += `<text x="${width / 2}" y="${width + frameHeight / 2 + 5}" text-anchor="middle" font-family="Inter, sans-serif" font-weight="bold" font-size="14" fill="${config.frameTextColor}">${config.frameText}</text>`;
@@ -621,7 +581,6 @@ export default function QRGeneratorPage() {
       const offset = config.margin;
       const gradientFill = config.useGradient ? "url(#qrGradient)" : fgColor;
 
-      // Draw corner squares
       const cornerPositions = [
         { x: offset, y: offset },
         { x: offset + (moduleCount - 7) * cellSize, y: offset },
@@ -645,7 +604,6 @@ export default function QRGeneratorPage() {
         );
       }
 
-      // Draw regular modules (excluding corners)
       for (let row = 0; row < moduleCount; row++) {
         for (let col = 0; col < moduleCount; col++) {
           if (qr.isDark(row, col) && !isCornerSquare(row, col, moduleCount)) {
@@ -656,15 +614,13 @@ export default function QRGeneratorPage() {
         }
       }
 
-      // Add logo if present
       if (config.logo) {
         const qrContentHeight = moduleCount * cellSize + config.margin * 2;
-        const logoSize = config.logoSize * (cellSize / 10); // Scale logo relative to SVG cell size
+        const logoSize = config.logoSize * (cellSize / 10);
         const logoX = (width - logoSize) / 2;
         const logoY = (qrContentHeight - logoSize) / 2;
         const bgPadding = config.logoMargin * (cellSize / 10);
 
-        // Logo background
         if (!config.transparentBackground) {
           if (config.logoBorderRadius > 0) {
             const scaledRadius = config.logoBorderRadius * (cellSize / 10);
@@ -674,7 +630,6 @@ export default function QRGeneratorPage() {
           }
         }
 
-        // Logo image with clip path for rounded corners
         if (config.logoBorderRadius > 0) {
           const clipId = "logoClip";
           const scaledRadius = config.logoBorderRadius * (cellSize / 10);
@@ -747,375 +702,404 @@ export default function QRGeneratorPage() {
     setPhoneNumber("");
   };
 
-  const SectionHeader = ({
-    title,
-    section,
-  }: {
-    title: string;
-    section: keyof typeof expandedSections;
-  }) => (
-    <button
-      onClick={() => toggleSection(section)}
-      className="flex w-full items-center justify-between py-2 text-left"
-    >
-      <span className="text-sm font-medium">{title}</span>
-      {expandedSections[section] ? (
-        <ChevronUp className="h-4 w-4 text-muted-foreground" />
-      ) : (
-        <ChevronDown className="h-4 w-4 text-muted-foreground" />
-      )}
-    </button>
-  );
-
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border">
-        <div className="mx-auto max-w-6xl px-4 py-4">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Retour aux outils
-          </Link>
-        </div>
+    <div className="flex h-screen flex-col bg-background">
+      {/* Header compact */}
+      <header className="flex h-11 shrink-0 items-center justify-between border-b border-border px-4">
+        <Link
+          href="/"
+          className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Retour
+        </Link>
+        <h1 className="text-sm font-semibold">Générateur de QR Code</h1>
+        <button
+          onClick={resetConfig}
+          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+        </button>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">Générateur de QR Code</h1>
-          <p className="mt-2 text-muted-foreground">
-            Créez des QR codes professionnels avec personnalisation avancée.
-          </p>
+      {/* Main content */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Zone principale - Preview */}
+        <div className="flex flex-1 flex-col">
+          {/* Zone de preview */}
+          <div className="flex flex-1 items-center justify-center overflow-auto p-6">
+            <div
+              className="flex items-center justify-center rounded-lg p-8"
+              style={{
+                backgroundColor: config.transparentBackground ? undefined : "#f1f5f9",
+                backgroundImage: config.transparentBackground
+                  ? "linear-gradient(45deg, #e2e8f0 25%, transparent 25%), linear-gradient(-45deg, #e2e8f0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e2e8f0 75%), linear-gradient(-45deg, transparent 75%, #e2e8f0 75%)"
+                  : undefined,
+                backgroundSize: "20px 20px",
+                backgroundPosition: "0 0, 0 10px, 10px -10px, -10px 0px",
+              }}
+            >
+              <canvas ref={canvasRef} className="hidden" />
+              {qrDataUrl ? (
+                <img
+                  src={qrDataUrl}
+                  alt="QR Code Preview"
+                  className="max-w-full"
+                  style={{ maxHeight: "300px" }}
+                />
+              ) : (
+                <div className="flex h-48 w-48 items-center justify-center text-center text-sm text-muted-foreground">
+                  Entrez du contenu pour générer votre QR code
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Barre d'actions en bas */}
+          <div className="flex items-center justify-between border-t border-border bg-card px-4 py-3">
+            <div className="flex items-center gap-2">
+              {(["png", "svg", "jpg", "webp"] as QRExportFormat[]).map((format) => (
+                <button
+                  key={format}
+                  onClick={() => handleDownload(format)}
+                  disabled={!qrDataUrl}
+                  className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium uppercase transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Download className="h-3 w-3" />
+                  {format}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={copyToClipboard}
+              disabled={!qrDataUrl}
+              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {copied ? (
+                <>
+                  <Check className="h-4 w-4" />
+                  Copié
+                </>
+              ) : (
+                <>
+                  <Copy className="h-4 w-4" />
+                  Copier
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
-        <div className="grid gap-8 lg:grid-cols-2">
-          {/* Configuration Panel */}
-          <div className="space-y-4">
-            {/* Content Type */}
-            <div className="rounded-lg border border-border bg-card p-4">
-              <h2 className="mb-3 text-sm font-medium">Type de contenu</h2>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {(Object.keys(contentTypeLabels) as QRContentType[]).map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => setConfig((prev) => ({ ...prev, contentType: type }))}
-                    className={`rounded-lg border px-3 py-2 text-xs transition-colors ${
-                      config.contentType === type
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border hover:bg-accent"
-                    }`}
-                  >
-                    {contentTypeLabels[type]}
-                  </button>
-                ))}
-              </div>
-            </div>
+        {/* Panneau de configuration */}
+        <div className="flex w-80 shrink-0 flex-col border-l border-border bg-card">
+          {/* Tabs */}
+          <div className="flex border-b border-border">
+            {[
+              { id: "content" as TabType, label: "Contenu" },
+              { id: "style" as TabType, label: "Style" },
+              { id: "advanced" as TabType, label: "Avancé" },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex-1 py-2.5 text-xs font-medium transition-colors ${
+                  activeTab === tab.id
+                    ? "border-b-2 border-primary text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
 
-            {/* Content Input */}
-            <div className="rounded-lg border border-border bg-card p-4">
-              <h2 className="mb-3 text-sm font-medium">Contenu</h2>
-              {config.contentType === "url" || config.contentType === "text" ? (
-                <textarea
-                  value={config.content}
-                  onChange={(e) => setConfig((prev) => ({ ...prev, content: e.target.value }))}
-                  placeholder={getContentPlaceholder(config.contentType)}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
-                  rows={3}
-                />
-              ) : config.contentType === "phone" ? (
-                <input
-                  type="tel"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  placeholder="+33612345678"
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
-                />
-              ) : config.contentType === "email" ? (
-                <div className="space-y-2">
-                  <input
-                    type="email"
-                    value={emailData.to}
-                    onChange={(e) => setEmailData((prev) => ({ ...prev, to: e.target.value }))}
-                    placeholder="Destinataire"
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
-                  />
-                  <input
-                    type="text"
-                    value={emailData.subject}
-                    onChange={(e) => setEmailData((prev) => ({ ...prev, subject: e.target.value }))}
-                    placeholder="Sujet"
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
-                  />
-                  <textarea
-                    value={emailData.body}
-                    onChange={(e) => setEmailData((prev) => ({ ...prev, body: e.target.value }))}
-                    placeholder="Corps du message"
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
-                    rows={2}
-                  />
-                </div>
-              ) : config.contentType === "sms" ? (
-                <div className="space-y-2">
-                  <input
-                    type="tel"
-                    value={smsData.phone}
-                    onChange={(e) => setSmsData((prev) => ({ ...prev, phone: e.target.value }))}
-                    placeholder="Numéro de téléphone"
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
-                  />
-                  <textarea
-                    value={smsData.message}
-                    onChange={(e) => setSmsData((prev) => ({ ...prev, message: e.target.value }))}
-                    placeholder="Message"
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
-                    rows={2}
-                  />
-                </div>
-              ) : config.contentType === "wifi" ? (
-                <div className="space-y-2">
-                  <input
-                    type="text"
-                    value={wifiData.ssid}
-                    onChange={(e) => setWifiData((prev) => ({ ...prev, ssid: e.target.value }))}
-                    placeholder="Nom du réseau (SSID)"
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
-                  />
-                  <input
-                    type="password"
-                    value={wifiData.password}
-                    onChange={(e) => setWifiData((prev) => ({ ...prev, password: e.target.value }))}
-                    placeholder="Mot de passe"
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
-                  />
-                  <div className="flex gap-2">
-                    <select
-                      value={wifiData.encryption}
-                      onChange={(e) => setWifiData((prev) => ({ ...prev, encryption: e.target.value as "WPA" | "WEP" | "nopass" }))}
-                      className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
-                    >
-                      <option value="WPA">WPA/WPA2</option>
-                      <option value="WEP">WEP</option>
-                      <option value="nopass">Sans mot de passe</option>
-                    </select>
-                    <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={wifiData.hidden}
-                        onChange={(e) => setWifiData((prev) => ({ ...prev, hidden: e.target.checked }))}
-                        className="rounded border-border"
-                      />
-                      Caché
-                    </label>
+          {/* Tab content */}
+          <div className="flex-1 overflow-y-auto p-4">
+            {activeTab === "content" && (
+              <div className="space-y-4">
+                {/* Type de contenu */}
+                <div>
+                  <p className="mb-2 text-xs font-medium">Type</p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {(Object.keys(contentTypeLabels) as QRContentType[]).map((type) => (
+                      <button
+                        key={type}
+                        onClick={() => setConfig((prev) => ({ ...prev, contentType: type }))}
+                        className={`rounded-lg border px-2 py-1.5 text-xs transition-colors ${
+                          config.contentType === type
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border hover:bg-accent"
+                        }`}
+                      >
+                        {contentTypeLabels[type]}
+                      </button>
+                    ))}
                   </div>
                 </div>
-              ) : config.contentType === "vcard" ? (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <input
-                    type="text"
-                    value={vcardData.firstName}
-                    onChange={(e) => setVcardData((prev) => ({ ...prev, firstName: e.target.value }))}
-                    placeholder="Prénom"
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
-                  />
-                  <input
-                    type="text"
-                    value={vcardData.lastName}
-                    onChange={(e) => setVcardData((prev) => ({ ...prev, lastName: e.target.value }))}
-                    placeholder="Nom"
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
-                  />
-                  <input
-                    type="text"
-                    value={vcardData.organization}
-                    onChange={(e) => setVcardData((prev) => ({ ...prev, organization: e.target.value }))}
-                    placeholder="Entreprise"
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
-                  />
-                  <input
-                    type="text"
-                    value={vcardData.title}
-                    onChange={(e) => setVcardData((prev) => ({ ...prev, title: e.target.value }))}
-                    placeholder="Poste"
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
-                  />
-                  <input
-                    type="email"
-                    value={vcardData.email}
-                    onChange={(e) => setVcardData((prev) => ({ ...prev, email: e.target.value }))}
-                    placeholder="Email"
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
-                  />
-                  <input
-                    type="tel"
-                    value={vcardData.phone}
-                    onChange={(e) => setVcardData((prev) => ({ ...prev, phone: e.target.value }))}
-                    placeholder="Téléphone"
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
-                  />
-                  <input
-                    type="url"
-                    value={vcardData.website}
-                    onChange={(e) => setVcardData((prev) => ({ ...prev, website: e.target.value }))}
-                    placeholder="Site web"
-                    className="col-span-full w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
-                  />
-                </div>
-              ) : null}
-            </div>
 
-            {/* Colors Section */}
-            <div className="rounded-lg border border-border bg-card p-4">
-              <SectionHeader title="Couleurs & Fond" section="colors" />
-              {expandedSections.colors && (
-                <div className="mt-3 space-y-4">
-                  {/* Transparent background */}
-                  <label className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      checked={config.transparentBackground}
-                      onChange={(e) => setConfig((prev) => ({ ...prev, transparentBackground: e.target.checked }))}
-                      className="rounded border-border"
+                {/* Champs de contenu */}
+                <div>
+                  <p className="mb-2 text-xs font-medium">Contenu</p>
+                  {config.contentType === "url" || config.contentType === "text" ? (
+                    <textarea
+                      value={config.content}
+                      onChange={(e) => setConfig((prev) => ({ ...prev, content: e.target.value }))}
+                      placeholder={getContentPlaceholder(config.contentType)}
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs focus:border-primary focus:outline-none"
+                      rows={3}
                     />
-                    <span className="text-sm">Fond transparent</span>
-                  </label>
-
-                  {!config.transparentBackground && (
-                    <div>
-                      <label className="mb-1 block text-xs text-muted-foreground">Couleur de fond</label>
-                      <div className="flex items-center gap-2">
+                  ) : config.contentType === "phone" ? (
+                    <input
+                      type="tel"
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      placeholder="+33612345678"
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs focus:border-primary focus:outline-none"
+                    />
+                  ) : config.contentType === "email" ? (
+                    <div className="space-y-1.5">
+                      <input
+                        type="email"
+                        value={emailData.to}
+                        onChange={(e) => setEmailData((prev) => ({ ...prev, to: e.target.value }))}
+                        placeholder="Destinataire"
+                        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs focus:border-primary focus:outline-none"
+                      />
+                      <input
+                        type="text"
+                        value={emailData.subject}
+                        onChange={(e) => setEmailData((prev) => ({ ...prev, subject: e.target.value }))}
+                        placeholder="Sujet"
+                        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs focus:border-primary focus:outline-none"
+                      />
+                      <textarea
+                        value={emailData.body}
+                        onChange={(e) => setEmailData((prev) => ({ ...prev, body: e.target.value }))}
+                        placeholder="Corps"
+                        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs focus:border-primary focus:outline-none"
+                        rows={2}
+                      />
+                    </div>
+                  ) : config.contentType === "sms" ? (
+                    <div className="space-y-1.5">
+                      <input
+                        type="tel"
+                        value={smsData.phone}
+                        onChange={(e) => setSmsData((prev) => ({ ...prev, phone: e.target.value }))}
+                        placeholder="Numéro"
+                        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs focus:border-primary focus:outline-none"
+                      />
+                      <textarea
+                        value={smsData.message}
+                        onChange={(e) => setSmsData((prev) => ({ ...prev, message: e.target.value }))}
+                        placeholder="Message"
+                        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs focus:border-primary focus:outline-none"
+                        rows={2}
+                      />
+                    </div>
+                  ) : config.contentType === "wifi" ? (
+                    <div className="space-y-1.5">
+                      <input
+                        type="text"
+                        value={wifiData.ssid}
+                        onChange={(e) => setWifiData((prev) => ({ ...prev, ssid: e.target.value }))}
+                        placeholder="Nom du réseau"
+                        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs focus:border-primary focus:outline-none"
+                      />
+                      <input
+                        type="password"
+                        value={wifiData.password}
+                        onChange={(e) => setWifiData((prev) => ({ ...prev, password: e.target.value }))}
+                        placeholder="Mot de passe"
+                        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs focus:border-primary focus:outline-none"
+                      />
+                      <div className="flex gap-2">
+                        <select
+                          value={wifiData.encryption}
+                          onChange={(e) => setWifiData((prev) => ({ ...prev, encryption: e.target.value as "WPA" | "WEP" | "nopass" }))}
+                          className="flex-1 rounded-lg border border-border bg-background px-2 py-1.5 text-xs"
+                        >
+                          <option value="WPA">WPA/WPA2</option>
+                          <option value="WEP">WEP</option>
+                          <option value="nopass">Aucun</option>
+                        </select>
+                        <label className="flex items-center gap-1.5 text-xs">
+                          <input
+                            type="checkbox"
+                            checked={wifiData.hidden}
+                            onChange={(e) => setWifiData((prev) => ({ ...prev, hidden: e.target.checked }))}
+                            className="rounded border-border"
+                          />
+                          Caché
+                        </label>
+                      </div>
+                    </div>
+                  ) : config.contentType === "vcard" ? (
+                    <div className="grid gap-1.5">
+                      <div className="grid grid-cols-2 gap-1.5">
                         <input
-                          type="color"
-                          value={config.backgroundColor}
-                          onChange={(e) => setConfig((prev) => ({ ...prev, backgroundColor: e.target.value }))}
-                          className="h-8 w-8 cursor-pointer rounded border border-border"
+                          type="text"
+                          value={vcardData.firstName}
+                          onChange={(e) => setVcardData((prev) => ({ ...prev, firstName: e.target.value }))}
+                          placeholder="Prénom"
+                          className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs"
                         />
                         <input
                           type="text"
-                          value={config.backgroundColor}
-                          onChange={(e) => setConfig((prev) => ({ ...prev, backgroundColor: e.target.value }))}
-                          className="flex-1 rounded-lg border border-border bg-background px-2 py-1 text-sm"
+                          value={vcardData.lastName}
+                          onChange={(e) => setVcardData((prev) => ({ ...prev, lastName: e.target.value }))}
+                          placeholder="Nom"
+                          className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs"
                         />
                       </div>
+                      <input
+                        type="text"
+                        value={vcardData.organization}
+                        onChange={(e) => setVcardData((prev) => ({ ...prev, organization: e.target.value }))}
+                        placeholder="Entreprise"
+                        className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs"
+                      />
+                      <input
+                        type="email"
+                        value={vcardData.email}
+                        onChange={(e) => setVcardData((prev) => ({ ...prev, email: e.target.value }))}
+                        placeholder="Email"
+                        className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs"
+                      />
+                      <input
+                        type="tel"
+                        value={vcardData.phone}
+                        onChange={(e) => setVcardData((prev) => ({ ...prev, phone: e.target.value }))}
+                        placeholder="Téléphone"
+                        className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs"
+                      />
+                      <input
+                        type="url"
+                        value={vcardData.website}
+                        onChange={(e) => setVcardData((prev) => ({ ...prev, website: e.target.value }))}
+                        placeholder="Site web"
+                        className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs"
+                      />
                     </div>
-                  )}
+                  ) : null}
+                </div>
+              </div>
+            )}
 
-                  {/* Gradient toggle */}
-                  <label className="flex items-center gap-3">
+            {activeTab === "style" && (
+              <div className="space-y-4">
+                {/* Couleurs */}
+                <div>
+                  <p className="mb-2 text-xs font-medium">Couleur QR</p>
+                  <label className="mb-2 flex items-center gap-2">
                     <input
                       type="checkbox"
                       checked={config.useGradient}
                       onChange={(e) => setConfig((prev) => ({ ...prev, useGradient: e.target.checked }))}
                       className="rounded border-border"
                     />
-                    <span className="text-sm">Utiliser un dégradé</span>
+                    <span className="text-xs">Dégradé</span>
                   </label>
-
                   {config.useGradient ? (
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       <div className="flex gap-2">
                         <button
                           onClick={() => setConfig((prev) => ({ ...prev, gradientType: "linear" }))}
-                          className={`flex-1 rounded-lg border px-3 py-1.5 text-xs ${config.gradientType === "linear" ? "border-primary bg-primary text-primary-foreground" : "border-border"}`}
+                          className={`flex-1 rounded-lg border px-2 py-1.5 text-xs ${config.gradientType === "linear" ? "border-primary bg-primary/10" : "border-border"}`}
                         >
                           Linéaire
                         </button>
                         <button
                           onClick={() => setConfig((prev) => ({ ...prev, gradientType: "radial" }))}
-                          className={`flex-1 rounded-lg border px-3 py-1.5 text-xs ${config.gradientType === "radial" ? "border-primary bg-primary text-primary-foreground" : "border-border"}`}
+                          className={`flex-1 rounded-lg border px-2 py-1.5 text-xs ${config.gradientType === "radial" ? "border-primary bg-primary/10" : "border-border"}`}
                         >
                           Radial
                         </button>
                       </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="mb-1 block text-xs text-muted-foreground">Couleur 1</label>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="color"
-                              value={config.gradientColor1}
-                              onChange={(e) => setConfig((prev) => ({ ...prev, gradientColor1: e.target.value }))}
-                              className="h-8 w-8 cursor-pointer rounded border border-border"
-                            />
-                            <input
-                              type="text"
-                              value={config.gradientColor1}
-                              onChange={(e) => setConfig((prev) => ({ ...prev, gradientColor1: e.target.value }))}
-                              className="w-full rounded border border-border bg-background px-2 py-1 text-xs"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="mb-1 block text-xs text-muted-foreground">Couleur 2</label>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="color"
-                              value={config.gradientColor2}
-                              onChange={(e) => setConfig((prev) => ({ ...prev, gradientColor2: e.target.value }))}
-                              className="h-8 w-8 cursor-pointer rounded border border-border"
-                            />
-                            <input
-                              type="text"
-                              value={config.gradientColor2}
-                              onChange={(e) => setConfig((prev) => ({ ...prev, gradientColor2: e.target.value }))}
-                              className="w-full rounded border border-border bg-background px-2 py-1 text-xs"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                      {config.gradientType === "linear" && (
-                        <div>
-                          <label className="mb-1 block text-xs text-muted-foreground">
-                            Rotation: {config.gradientRotation}°
-                          </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={config.gradientColor1}
+                          onChange={(e) => setConfig((prev) => ({ ...prev, gradientColor1: e.target.value }))}
+                          className="h-7 w-7 cursor-pointer rounded border border-border"
+                        />
+                        <input
+                          type="color"
+                          value={config.gradientColor2}
+                          onChange={(e) => setConfig((prev) => ({ ...prev, gradientColor2: e.target.value }))}
+                          className="h-7 w-7 cursor-pointer rounded border border-border"
+                        />
+                        {config.gradientType === "linear" && (
                           <input
                             type="range"
                             min="0"
                             max="360"
                             value={config.gradientRotation}
                             onChange={(e) => setConfig((prev) => ({ ...prev, gradientRotation: parseInt(e.target.value) }))}
-                            className="w-full"
+                            className="flex-1"
                           />
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   ) : (
-                    <div>
-                      <label className="mb-1 block text-xs text-muted-foreground">Couleur du QR</label>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="color"
-                          value={config.foregroundColor}
-                          onChange={(e) => setConfig((prev) => ({ ...prev, foregroundColor: e.target.value }))}
-                          className="h-8 w-8 cursor-pointer rounded border border-border"
-                        />
-                        <input
-                          type="text"
-                          value={config.foregroundColor}
-                          onChange={(e) => setConfig((prev) => ({ ...prev, foregroundColor: e.target.value }))}
-                          className="flex-1 rounded-lg border border-border bg-background px-2 py-1 text-sm"
-                        />
-                      </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={config.foregroundColor}
+                        onChange={(e) => setConfig((prev) => ({ ...prev, foregroundColor: e.target.value }))}
+                        className="h-7 w-7 cursor-pointer rounded border border-border"
+                      />
+                      <input
+                        type="text"
+                        value={config.foregroundColor}
+                        onChange={(e) => setConfig((prev) => ({ ...prev, foregroundColor: e.target.value }))}
+                        className="flex-1 rounded border border-border bg-background px-2 py-1 text-xs"
+                      />
                     </div>
                   )}
                 </div>
-              )}
-            </div>
 
-            {/* Dots Style Section */}
-            <div className="rounded-lg border border-border bg-card p-4">
-              <SectionHeader title="Style des pixels" section="dots" />
-              {expandedSections.dots && (
-                <div className="mt-3">
-                  <div className="flex flex-wrap gap-2">
+                {/* Fond */}
+                <div>
+                  <p className="mb-2 text-xs font-medium">Fond</p>
+                  <label className="mb-2 flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={config.transparentBackground}
+                      onChange={(e) => setConfig((prev) => ({ ...prev, transparentBackground: e.target.checked }))}
+                      className="rounded border-border"
+                    />
+                    <span className="text-xs">Transparent</span>
+                  </label>
+                  {!config.transparentBackground && (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={config.backgroundColor}
+                        onChange={(e) => setConfig((prev) => ({ ...prev, backgroundColor: e.target.value }))}
+                        className="h-7 w-7 cursor-pointer rounded border border-border"
+                      />
+                      <input
+                        type="text"
+                        value={config.backgroundColor}
+                        onChange={(e) => setConfig((prev) => ({ ...prev, backgroundColor: e.target.value }))}
+                        className="flex-1 rounded border border-border bg-background px-2 py-1 text-xs"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Style pixels */}
+                <div>
+                  <p className="mb-2 text-xs font-medium">Style des pixels</p>
+                  <div className="flex flex-wrap gap-1.5">
                     {(Object.keys(dotStyleLabels) as QRDotStyle[]).map((style) => (
                       <button
                         key={style}
                         onClick={() => setConfig((prev) => ({ ...prev, dotStyle: style }))}
-                        className={`rounded-lg border px-3 py-1.5 text-xs transition-colors ${
+                        className={`rounded-lg border px-2 py-1 text-xs ${
                           config.dotStyle === style
-                            ? "border-primary bg-primary text-primary-foreground"
+                            ? "border-primary bg-primary/10"
                             : "border-border hover:bg-accent"
                         }`}
                       >
@@ -1124,153 +1108,65 @@ export default function QRGeneratorPage() {
                     ))}
                   </div>
                 </div>
-              )}
-            </div>
 
-            {/* Corners Section */}
-            <div className="rounded-lg border border-border bg-card p-4">
-              <SectionHeader title="Coins (3 carrés)" section="corners" />
-              {expandedSections.corners && (
-                <div className="mt-3 space-y-4">
-                  {/* Corner Square Style */}
-                  <div>
-                    <label className="mb-2 block text-xs text-muted-foreground">Forme extérieure</label>
-                    <div className="flex flex-wrap gap-2">
-                      {(Object.keys(cornerSquareStyleLabels) as QRCornerSquareStyle[]).map((style) => (
-                        <button
-                          key={style}
-                          onClick={() => setConfig((prev) => ({ ...prev, cornerSquareStyle: style }))}
-                          className={`rounded-lg border px-3 py-1.5 text-xs transition-colors ${
-                            config.cornerSquareStyle === style
-                              ? "border-primary bg-primary text-primary-foreground"
-                              : "border-border hover:bg-accent"
-                          }`}
-                        >
-                          {cornerSquareStyleLabels[style]}
-                        </button>
-                      ))}
-                    </div>
-                    <label className="mt-2 flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={config.useCustomCornerSquareColor}
-                        onChange={(e) => setConfig((prev) => ({ ...prev, useCustomCornerSquareColor: e.target.checked }))}
-                        className="rounded border-border"
-                      />
-                      <span className="text-xs">Couleur personnalisée</span>
-                      {config.useCustomCornerSquareColor && (
-                        <input
-                          type="color"
-                          value={config.cornerSquareColor}
-                          onChange={(e) => setConfig((prev) => ({ ...prev, cornerSquareColor: e.target.value }))}
-                          className="ml-2 h-6 w-6 cursor-pointer rounded border border-border"
-                        />
-                      )}
-                    </label>
-                  </div>
-
-                  {/* Corner Dot Style */}
-                  <div>
-                    <label className="mb-2 block text-xs text-muted-foreground">Forme intérieure (centre)</label>
-                    <div className="flex flex-wrap gap-2">
-                      {(Object.keys(cornerDotStyleLabels) as QRCornerDotStyle[]).map((style) => (
-                        <button
-                          key={style}
-                          onClick={() => setConfig((prev) => ({ ...prev, cornerDotStyle: style }))}
-                          className={`rounded-lg border px-3 py-1.5 text-xs transition-colors ${
-                            config.cornerDotStyle === style
-                              ? "border-primary bg-primary text-primary-foreground"
-                              : "border-border hover:bg-accent"
-                          }`}
-                        >
-                          {cornerDotStyleLabels[style]}
-                        </button>
-                      ))}
-                    </div>
-                    <label className="mt-2 flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={config.useCustomCornerDotColor}
-                        onChange={(e) => setConfig((prev) => ({ ...prev, useCustomCornerDotColor: e.target.checked }))}
-                        className="rounded border-border"
-                      />
-                      <span className="text-xs">Couleur personnalisée</span>
-                      {config.useCustomCornerDotColor && (
-                        <input
-                          type="color"
-                          value={config.cornerDotColor}
-                          onChange={(e) => setConfig((prev) => ({ ...prev, cornerDotColor: e.target.value }))}
-                          className="ml-2 h-6 w-6 cursor-pointer rounded border border-border"
-                        />
-                      )}
-                    </label>
+                {/* Style coins */}
+                <div>
+                  <p className="mb-2 text-xs font-medium">Style des coins</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(Object.keys(cornerSquareStyleLabels) as QRCornerSquareStyle[]).map((style) => (
+                      <button
+                        key={style}
+                        onClick={() => setConfig((prev) => ({ ...prev, cornerSquareStyle: style }))}
+                        className={`rounded-lg border px-2 py-1 text-xs ${
+                          config.cornerSquareStyle === style
+                            ? "border-primary bg-primary/10"
+                            : "border-border hover:bg-accent"
+                        }`}
+                      >
+                        {cornerSquareStyleLabels[style]}
+                      </button>
+                    ))}
                   </div>
                 </div>
-              )}
-            </div>
 
-            {/* Logo Section */}
-            <div className="rounded-lg border border-border bg-card p-4">
-              <SectionHeader title="Logo" section="logo" />
-              {expandedSections.logo && (
-                <div className="mt-3 space-y-3">
+                {/* Logo */}
+                <div>
+                  <p className="mb-2 text-xs font-medium">Logo</p>
                   {config.logo ? (
-                    <div className="flex items-start gap-4">
+                    <div className="flex items-center gap-3">
                       <img
                         src={config.logo}
                         alt="Logo"
-                        className="h-16 w-16 rounded-lg border border-border object-contain"
+                        className="h-12 w-12 rounded border border-border object-contain"
                       />
-                      <div className="flex-1 space-y-2">
-                        <div>
-                          <label className="text-xs text-muted-foreground">Taille: {config.logoSize}px</label>
-                          <input
-                            type="range"
-                            min="30"
-                            max="120"
-                            value={config.logoSize}
-                            onChange={(e) => setConfig((prev) => ({ ...prev, logoSize: parseInt(e.target.value) }))}
-                            className="w-full"
-                          />
+                      <div className="flex-1 space-y-1.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span>Taille</span>
+                          <span className="text-muted-foreground">{config.logoSize}px</span>
                         </div>
-                        <div>
-                          <label className="text-xs text-muted-foreground">Marge: {config.logoMargin}px</label>
-                          <input
-                            type="range"
-                            min="0"
-                            max="20"
-                            value={config.logoMargin}
-                            onChange={(e) => setConfig((prev) => ({ ...prev, logoMargin: parseInt(e.target.value) }))}
-                            className="w-full"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-muted-foreground">Arrondi: {config.logoBorderRadius}px</label>
-                          <input
-                            type="range"
-                            min="0"
-                            max="30"
-                            value={config.logoBorderRadius}
-                            onChange={(e) => setConfig((prev) => ({ ...prev, logoBorderRadius: parseInt(e.target.value) }))}
-                            className="w-full"
-                          />
-                        </div>
-                        <button
-                          onClick={removeLogo}
-                          className="flex items-center gap-1 text-xs text-destructive hover:underline"
-                        >
-                          <X className="h-3 w-3" />
-                          Supprimer
-                        </button>
+                        <input
+                          type="range"
+                          min="30"
+                          max="120"
+                          value={config.logoSize}
+                          onChange={(e) => setConfig((prev) => ({ ...prev, logoSize: parseInt(e.target.value) }))}
+                          className="w-full"
+                        />
                       </div>
+                      <button
+                        onClick={removeLogo}
+                        className="p-1 text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
                     </div>
                   ) : (
                     <button
                       onClick={() => fileInputRef.current?.click()}
-                      className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border py-6 text-sm text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
+                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border py-3 text-xs text-muted-foreground hover:border-primary hover:text-foreground"
                     >
-                      <Upload className="h-5 w-5" />
-                      Uploader un logo
+                      <Upload className="h-4 w-4" />
+                      Ajouter un logo
                     </button>
                   )}
                   <input
@@ -1280,198 +1176,150 @@ export default function QRGeneratorPage() {
                     onChange={handleLogoUpload}
                     className="hidden"
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Conseil: utilisez un niveau de correction &quot;Haut&quot; avec un logo.
-                  </p>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
-            {/* Frame Section */}
-            <div className="rounded-lg border border-border bg-card p-4">
-              <SectionHeader title="Cadre avec texte" section="frame" />
-              {expandedSections.frame && (
-                <div className="mt-3 space-y-3">
-                  <label className="flex items-center gap-3">
+            {activeTab === "advanced" && (
+              <div className="space-y-4">
+                {/* Taille */}
+                <div>
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="text-xs font-medium">Taille</p>
+                    <span className="text-xs text-muted-foreground">{config.size}px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="100"
+                    max="600"
+                    step="10"
+                    value={config.size}
+                    onChange={(e) => setConfig((prev) => ({ ...prev, size: parseInt(e.target.value) }))}
+                    className="w-full"
+                  />
+                </div>
+
+                {/* Marge */}
+                <div>
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="text-xs font-medium">Marge</p>
+                    <span className="text-xs text-muted-foreground">{config.margin}px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="20"
+                    value={config.margin}
+                    onChange={(e) => setConfig((prev) => ({ ...prev, margin: parseInt(e.target.value) }))}
+                    className="w-full"
+                  />
+                </div>
+
+                {/* Correction d'erreur */}
+                <div>
+                  <p className="mb-2 text-xs font-medium">Correction d&apos;erreur</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(Object.keys(errorLevelLabels) as QRErrorLevel[]).map((level) => (
+                      <button
+                        key={level}
+                        onClick={() => setConfig((prev) => ({ ...prev, errorLevel: level }))}
+                        className={`rounded-lg border px-2.5 py-1.5 text-xs ${
+                          config.errorLevel === level
+                            ? "border-primary bg-primary/10"
+                            : "border-border hover:bg-accent"
+                        }`}
+                      >
+                        {errorLevelLabels[level]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Cadre */}
+                <div className="border-t border-border pt-4">
+                  <label className="mb-3 flex items-center gap-2">
                     <input
                       type="checkbox"
                       checked={config.showFrame}
                       onChange={(e) => setConfig((prev) => ({ ...prev, showFrame: e.target.checked }))}
                       className="rounded border-border"
                     />
-                    <span className="text-sm">Afficher le cadre</span>
+                    <span className="text-xs font-medium">Cadre avec texte</span>
                   </label>
                   {config.showFrame && (
-                    <>
-                      <div>
-                        <label className="mb-1 block text-xs text-muted-foreground">Texte du cadre</label>
+                    <div className="space-y-2 pl-5">
+                      <input
+                        type="text"
+                        value={config.frameText}
+                        onChange={(e) => setConfig((prev) => ({ ...prev, frameText: e.target.value }))}
+                        placeholder="SCAN ME"
+                        className="w-full rounded-lg border border-border bg-background px-2 py-1.5 text-xs"
+                      />
+                      <div className="flex items-center gap-2">
                         <input
-                          type="text"
-                          value={config.frameText}
-                          onChange={(e) => setConfig((prev) => ({ ...prev, frameText: e.target.value }))}
-                          placeholder="SCAN ME"
-                          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
+                          type="color"
+                          value={config.frameColor}
+                          onChange={(e) => setConfig((prev) => ({ ...prev, frameColor: e.target.value }))}
+                          className="h-6 w-6 cursor-pointer rounded border border-border"
+                          title="Couleur du cadre"
+                        />
+                        <input
+                          type="color"
+                          value={config.frameTextColor}
+                          onChange={(e) => setConfig((prev) => ({ ...prev, frameTextColor: e.target.value }))}
+                          className="h-6 w-6 cursor-pointer rounded border border-border"
+                          title="Couleur du texte"
                         />
                       </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="mb-1 block text-xs text-muted-foreground">Fond du cadre</label>
-                          <input
-                            type="color"
-                            value={config.frameColor}
-                            onChange={(e) => setConfig((prev) => ({ ...prev, frameColor: e.target.value }))}
-                            className="h-8 w-full cursor-pointer rounded border border-border"
-                          />
-                        </div>
-                        <div>
-                          <label className="mb-1 block text-xs text-muted-foreground">Texte</label>
-                          <input
-                            type="color"
-                            value={config.frameTextColor}
-                            onChange={(e) => setConfig((prev) => ({ ...prev, frameTextColor: e.target.value }))}
-                            className="h-8 w-full cursor-pointer rounded border border-border"
-                          />
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Advanced Section */}
-            <div className="rounded-lg border border-border bg-card p-4">
-              <SectionHeader title="Options avancées" section="advanced" />
-              {expandedSections.advanced && (
-                <div className="mt-3 space-y-4">
-                  <div>
-                    <label className="mb-1 block text-xs text-muted-foreground">
-                      Taille: {config.size}px
-                    </label>
-                    <input
-                      type="range"
-                      min="100"
-                      max="600"
-                      step="10"
-                      value={config.size}
-                      onChange={(e) => setConfig((prev) => ({ ...prev, size: parseInt(e.target.value) }))}
-                      className="w-full"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs text-muted-foreground">
-                      Marge: {config.margin}px
-                    </label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="20"
-                      value={config.margin}
-                      onChange={(e) => setConfig((prev) => ({ ...prev, margin: parseInt(e.target.value) }))}
-                      className="w-full"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-2 block text-xs text-muted-foreground">Niveau de correction</label>
-                    <div className="flex flex-wrap gap-2">
-                      {(Object.keys(errorLevelLabels) as QRErrorLevel[]).map((level) => (
-                        <button
-                          key={level}
-                          onClick={() => setConfig((prev) => ({ ...prev, errorLevel: level }))}
-                          className={`rounded-lg border px-3 py-1.5 text-xs transition-colors ${
-                            config.errorLevel === level
-                              ? "border-primary bg-primary text-primary-foreground"
-                              : "border-border hover:bg-accent"
-                          }`}
-                        >
-                          {errorLevelLabels[level]}
-                        </button>
-                      ))}
                     </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Preview Panel */}
-          <div className="lg:sticky lg:top-8 lg:self-start">
-            <div className="rounded-lg border border-border bg-card p-6">
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-semibold">Prévisualisation</h2>
-                <button
-                  onClick={resetConfig}
-                  className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Réinitialiser
-                </button>
-              </div>
-
-              <div
-                className="mb-6 flex items-center justify-center rounded-lg p-8"
-                style={{
-                  backgroundColor: config.transparentBackground ? undefined : "#f1f5f9",
-                  backgroundImage: config.transparentBackground
-                    ? "linear-gradient(45deg, #e2e8f0 25%, transparent 25%), linear-gradient(-45deg, #e2e8f0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e2e8f0 75%), linear-gradient(-45deg, transparent 75%, #e2e8f0 75%)"
-                    : undefined,
-                  backgroundSize: "20px 20px",
-                  backgroundPosition: "0 0, 0 10px, 10px -10px, -10px 0px",
-                }}
-              >
-                <canvas ref={canvasRef} className="hidden" />
-                {qrDataUrl ? (
-                  <img
-                    src={qrDataUrl}
-                    alt="QR Code Preview"
-                    className="max-w-full"
-                    style={{ maxHeight: "300px" }}
-                  />
-                ) : (
-                  <div className="flex h-48 w-48 items-center justify-center text-center text-sm text-muted-foreground">
-                    Entrez du contenu pour générer votre QR code
-                  </div>
-                )}
-              </div>
-
-              {/* Download Buttons */}
-              <div className="space-y-3">
-                <p className="text-sm font-medium">Télécharger</p>
-                <div className="grid grid-cols-4 gap-2">
-                  {(["png", "svg", "jpg", "webp"] as QRExportFormat[]).map((format) => (
-                    <button
-                      key={format}
-                      onClick={() => handleDownload(format)}
-                      disabled={!qrDataUrl}
-                      className="flex items-center justify-center gap-1.5 rounded-lg border border-border bg-background px-3 py-2.5 text-xs font-medium uppercase transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                      {format}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  onClick={copyToClipboard}
-                  disabled={!qrDataUrl}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 py-2.5 text-sm font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {copied ? (
-                    <>
-                      <Check className="h-4 w-4 text-green-500" />
-                      Copié !
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-4 w-4" />
-                      Copier dans le presse-papier
-                    </>
                   )}
-                </button>
+                </div>
+
+                {/* Couleurs coins personnalisées */}
+                <div className="border-t border-border pt-4">
+                  <p className="mb-3 text-xs font-medium">Couleurs des coins</p>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={config.useCustomCornerSquareColor}
+                        onChange={(e) => setConfig((prev) => ({ ...prev, useCustomCornerSquareColor: e.target.checked }))}
+                        className="rounded border-border"
+                      />
+                      <span className="text-xs">Carré extérieur</span>
+                      {config.useCustomCornerSquareColor && (
+                        <input
+                          type="color"
+                          value={config.cornerSquareColor}
+                          onChange={(e) => setConfig((prev) => ({ ...prev, cornerSquareColor: e.target.value }))}
+                          className="ml-auto h-5 w-5 cursor-pointer rounded border border-border"
+                        />
+                      )}
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={config.useCustomCornerDotColor}
+                        onChange={(e) => setConfig((prev) => ({ ...prev, useCustomCornerDotColor: e.target.checked }))}
+                        className="rounded border-border"
+                      />
+                      <span className="text-xs">Point central</span>
+                      {config.useCustomCornerDotColor && (
+                        <input
+                          type="color"
+                          value={config.cornerDotColor}
+                          onChange={(e) => setConfig((prev) => ({ ...prev, cornerDotColor: e.target.value }))}
+                          className="ml-auto h-5 w-5 cursor-pointer rounded border border-border"
+                        />
+                      )}
+                    </label>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

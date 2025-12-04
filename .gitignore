@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# AI models (self-hosted, ~330MB)
+# Downloaded from https://staticimgly.com/@imgly/background-removal-data/
+# Run: curl script or see /public/models/bg-removal/README.md
+/public/models/bg-removal/

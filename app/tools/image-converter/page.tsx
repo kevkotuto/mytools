@@ -6,22 +6,19 @@ import {
   ArrowLeft,
   Upload,
   Download,
-  RotateCcw,
   RotateCw,
   FlipHorizontal,
   FlipVertical,
   Trash2,
   Image as ImageIcon,
-  Settings,
-  Palette,
-  Maximize,
-  ChevronDown,
-  ChevronUp,
   RefreshCw,
   ZoomIn,
   ZoomOut,
   Copy,
   Check,
+  Sun,
+  Contrast,
+  Droplets,
 } from "lucide-react";
 import type { ImageConfig, ImageFormat, ResizeMode, RotationAngle, FlipDirection, ImageInfo } from "@/types/image";
 import { defaultImageConfig, formatLabels, formatMimeTypes } from "@/types/image";
@@ -35,22 +32,10 @@ export default function ImageConverterPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [zoom, setZoom] = useState(100);
   const [copied, setCopied] = useState(false);
+  const [activeTab, setActiveTab] = useState<"format" | "resize" | "adjust">("format");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  const [expandedSections, setExpandedSections] = useState({
-    format: true,
-    resize: true,
-    transform: true,
-    filters: true,
-    adjustments: true,
-    effects: true,
-  });
-
-  const toggleSection = (section: keyof typeof expandedSections) => {
-    setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
-  };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -101,7 +86,6 @@ export default function ImageConverterPage() {
       return;
     }
 
-    // Calculate dimensions
     let targetWidth = originalImage.width;
     let targetHeight = originalImage.height;
 
@@ -131,32 +115,26 @@ export default function ImageConverterPage() {
         : originalImage.width;
     }
 
-    // Add padding
     const paddedWidth = targetWidth + config.padding * 2;
     const paddedHeight = targetHeight + config.padding * 2;
 
-    // Handle rotation
     const isRotated = config.rotation === 90 || config.rotation === 270;
     canvas.width = isRotated ? paddedHeight : paddedWidth;
     canvas.height = isRotated ? paddedWidth : paddedHeight;
 
-    // Fill background/padding
     ctx.fillStyle = config.padding > 0 ? config.paddingColor : config.backgroundColor;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Apply transformations
     ctx.save();
     ctx.translate(canvas.width / 2, canvas.height / 2);
     ctx.rotate((config.rotation * Math.PI) / 180);
 
-    // Apply flip
     let scaleX = 1;
     let scaleY = 1;
     if (config.flip === "horizontal" || config.flip === "both") scaleX = -1;
     if (config.flip === "vertical" || config.flip === "both") scaleY = -1;
     ctx.scale(scaleX, scaleY);
 
-    // Build filter string
     const filters: string[] = [];
     if (config.grayscale) filters.push("grayscale(100%)");
     if (config.sepia) filters.push("sepia(100%)");
@@ -169,7 +147,6 @@ export default function ImageConverterPage() {
     if (config.opacity !== 100) filters.push(`opacity(${config.opacity}%)`);
     ctx.filter = filters.length > 0 ? filters.join(" ") : "none";
 
-    // Draw image
     ctx.drawImage(
       originalImage,
       -targetWidth / 2,
@@ -180,7 +157,6 @@ export default function ImageConverterPage() {
 
     ctx.restore();
 
-    // Apply border radius
     if (config.borderRadius > 0) {
       ctx.globalCompositeOperation = "destination-in";
       ctx.beginPath();
@@ -190,7 +166,6 @@ export default function ImageConverterPage() {
       ctx.globalCompositeOperation = "source-over";
     }
 
-    // Generate preview
     const quality = config.format === "png" || config.format === "gif" ? 1 : config.quality / 100;
     const mimeType = formatMimeTypes[config.format];
 
@@ -214,7 +189,6 @@ export default function ImageConverterPage() {
     );
   }, [originalImage, config]);
 
-  // Process image when config changes
   useEffect(() => {
     if (originalImage) {
       const timeout = setTimeout(processImage, 100);
@@ -256,13 +230,14 @@ export default function ImageConverterPage() {
   };
 
   const handleReset = () => {
-    setConfig(defaultImageConfig);
     if (originalImage) {
-      setConfig((prev) => ({
+      setConfig({
         ...defaultImageConfig,
         width: originalImage.width,
         height: originalImage.height,
-      }));
+      });
+    } else {
+      setConfig(defaultImageConfig);
     }
   };
 
@@ -281,367 +256,400 @@ export default function ImageConverterPage() {
     return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
   };
 
-  const SectionHeader = ({
-    title,
-    icon: Icon,
-    section,
-  }: {
-    title: string;
-    icon: React.ElementType;
-    section: keyof typeof expandedSections;
-  }) => (
-    <button
-      onClick={() => toggleSection(section)}
-      className="flex w-full items-center justify-between py-2 text-left"
-    >
-      <span className="flex items-center gap-2 text-sm font-medium">
-        <Icon className="h-4 w-4 text-muted-foreground" />
-        {title}
-      </span>
-      {expandedSections[section] ? (
-        <ChevronUp className="h-4 w-4 text-muted-foreground" />
-      ) : (
-        <ChevronDown className="h-4 w-4 text-muted-foreground" />
-      )}
-    </button>
-  );
-
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
+      {/* Header compact */}
       <header className="border-b border-border">
-        <div className="mx-auto max-w-6xl px-4 py-4">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <Link
             href="/"
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
-            Retour aux outils
+            <span className="hidden sm:inline">Retour</span>
           </Link>
+          <h1 className="text-lg font-semibold">Convertisseur d&apos;Images</h1>
+          <div className="w-16" />
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">Convertisseur d&apos;Images</h1>
-          <p className="mt-2 text-muted-foreground">
-            Convertissez, redimensionnez et appliquez des filtres à vos images. Tout se passe localement.
-          </p>
-        </div>
-
-        {/* Upload Zone */}
-        {!originalImage && (
+      <main className="mx-auto max-w-7xl p-4">
+        {/* Upload Zone - Plus compacte */}
+        {!originalImage ? (
           <div
             onDrop={handleDrop}
             onDragOver={(e) => e.preventDefault()}
-            className="mb-8 flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-card p-12 transition-colors hover:border-primary/50"
+            className="flex h-[calc(100vh-120px)] flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-card transition-colors hover:border-primary/50"
           >
-            <Upload className="mb-4 h-12 w-12 text-muted-foreground" />
-            <p className="mb-2 text-lg font-medium">Glissez une image ici</p>
-            <p className="mb-4 text-sm text-muted-foreground">
-              ou cliquez pour sélectionner
-            </p>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileSelect}
-              className="hidden"
-            />
+            <Upload className="mb-4 h-16 w-16 text-muted-foreground" />
+            <p className="mb-2 text-xl font-medium">Glissez une image ici</p>
+            <p className="mb-6 text-sm text-muted-foreground">PNG, JPEG, WebP, GIF, BMP, SVG</p>
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="rounded-lg border border-primary bg-primary px-6 py-2 text-sm font-medium text-primary-foreground transition-colors hover:opacity-90"
+              className="rounded-lg border border-primary bg-primary px-8 py-3 text-sm font-medium text-primary-foreground hover:opacity-90"
             >
-              Sélectionner une image
+              Sélectionner
             </button>
-            <p className="mt-4 text-xs text-muted-foreground">
-              Formats supportés: PNG, JPEG, WebP, GIF, BMP, SVG
-            </p>
           </div>
-        )}
+        ) : (
+          /* Interface principale - Layout horizontal optimisé */
+          <div className="flex h-[calc(100vh-88px)] flex-col gap-4 lg:flex-row">
+            {/* Zone de prévisualisation - Priorité visuelle */}
+            <div className="flex flex-1 flex-col rounded-lg border border-border bg-card">
+              {/* Toolbar preview */}
+              <div className="flex items-center justify-between border-b border-border px-4 py-2">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setZoom(Math.max(25, zoom - 25))}
+                    className="rounded border border-border p-1.5 text-muted-foreground hover:bg-accent"
+                  >
+                    <ZoomOut className="h-4 w-4" />
+                  </button>
+                  <span className="min-w-[3rem] text-center text-xs text-muted-foreground">{zoom}%</span>
+                  <button
+                    onClick={() => setZoom(Math.min(200, zoom + 25))}
+                    className="rounded border border-border p-1.5 text-muted-foreground hover:bg-accent"
+                  >
+                    <ZoomIn className="h-4 w-4" />
+                  </button>
+                </div>
 
-        {originalImage && (
-          <div className="grid gap-6 lg:grid-cols-[1fr,400px]">
-            {/* Configuration Panel */}
-            <div className="space-y-4">
-              {/* Original Info */}
-              <div className="rounded-lg border border-border bg-card p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">{originalInfo?.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {originalInfo?.width} × {originalInfo?.height} px • {formatFileSize(originalInfo?.size || 0)}
-                    </p>
+                {/* Info sortie compacte */}
+                {outputInfo && (
+                  <div className="hidden items-center gap-4 text-xs text-muted-foreground sm:flex">
+                    <span>{outputInfo.width} × {outputInfo.height}</span>
+                    <span>{formatFileSize(outputInfo.size)}</span>
+                    {originalInfo && (
+                      <span className={outputInfo.size < originalInfo.size ? "text-green-600" : "text-orange-500"}>
+                        {outputInfo.size < originalInfo.size ? "−" : "+"}
+                        {Math.abs(Math.round((1 - outputInfo.size / originalInfo.size) * 100))}%
+                      </span>
+                    )}
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleReset}
-                      className="rounded-lg border border-border bg-background p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                      title="Réinitialiser"
-                    >
-                      <RefreshCw className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={handleClear}
-                      className="rounded-lg border border-border bg-background p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                      title="Supprimer"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                )}
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleReset}
+                    className="rounded border border-border p-1.5 text-muted-foreground hover:bg-accent"
+                    title="Réinitialiser"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={handleClear}
+                    className="rounded border border-border p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    title="Supprimer"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Zone preview */}
+              <div className="relative flex-1 overflow-auto bg-[repeating-conic-gradient(#80808010_0%_25%,transparent_0%_50%)] bg-[length:16px_16px]">
+                <div
+                  className="flex min-h-full items-center justify-center p-4"
+                  style={{ transform: `scale(${zoom / 100})`, transformOrigin: "center" }}
+                >
+                  {previewUrl && <img src={previewUrl} alt="Preview" className="max-w-full" />}
+                  {isProcessing && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-background/50">
+                      <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Actions download - Toujours visible */}
+              <div className="flex items-center gap-2 border-t border-border p-3">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="rounded-lg border border-border px-4 py-2 text-sm hover:bg-accent"
+                >
+                  <Upload className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={handleCopyToClipboard}
+                  disabled={!previewUrl}
+                  className="rounded-lg border border-border px-4 py-2 text-sm hover:bg-accent disabled:opacity-50"
+                >
+                  {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                </button>
+                <button
+                  onClick={handleDownload}
+                  disabled={!previewUrl}
+                  className="ml-auto flex items-center gap-2 rounded-lg border border-primary bg-primary px-6 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                >
+                  <Download className="h-4 w-4" />
+                  Télécharger {config.format.toUpperCase()}
+                </button>
+              </div>
+            </div>
+
+            {/* Panneau de configuration - Compact avec tabs */}
+            <div className="flex w-full flex-col rounded-lg border border-border bg-card lg:w-80">
+              {/* Info fichier original */}
+              <div className="border-b border-border p-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-background">
+                    <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{originalInfo?.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {originalInfo?.width} × {originalInfo?.height} • {formatFileSize(originalInfo?.size || 0)}
+                    </p>
                   </div>
                 </div>
               </div>
 
-              {/* Format */}
-              <div className="rounded-lg border border-border bg-card">
-                <div className="p-4">
-                  <SectionHeader title="Format de sortie" icon={ImageIcon} section="format" />
-                  {expandedSections.format && (
-                    <div className="mt-3 space-y-4">
-                      <div className="grid grid-cols-3 gap-2">
+              {/* Tabs navigation */}
+              <div className="flex border-b border-border">
+                {[
+                  { id: "format", label: "Format" },
+                  { id: "resize", label: "Taille" },
+                  { id: "adjust", label: "Effets" },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                    className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
+                      activeTab === tab.id
+                        ? "border-b-2 border-primary text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Contenu des tabs - Scrollable */}
+              <div className="flex-1 overflow-y-auto p-4">
+                {/* Tab Format */}
+                {activeTab === "format" && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="mb-2 block text-xs font-medium text-muted-foreground">FORMAT DE SORTIE</label>
+                      <div className="grid grid-cols-3 gap-1.5">
                         {(Object.keys(formatLabels) as ImageFormat[]).map((format) => (
                           <button
                             key={format}
                             onClick={() => setConfig((prev) => ({ ...prev, format }))}
-                            className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
+                            className={`rounded-lg border py-2 text-xs font-medium transition-colors ${
                               config.format === format
-                                ? "border-primary bg-primary/5 font-medium"
-                                : "border-border bg-background hover:bg-accent"
+                                ? "border-primary bg-primary/10 text-foreground"
+                                : "border-border hover:bg-accent"
                             }`}
                           >
                             {format.toUpperCase()}
                           </button>
                         ))}
                       </div>
-
-                      {(config.format === "jpeg" || config.format === "webp") && (
-                        <div>
-                          <label className="mb-2 flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">Qualité</span>
-                            <span className="font-medium">{config.quality}%</span>
-                          </label>
-                          <input
-                            type="range"
-                            min="1"
-                            max="100"
-                            value={config.quality}
-                            onChange={(e) =>
-                              setConfig((prev) => ({ ...prev, quality: parseInt(e.target.value) }))
-                            }
-                            className="w-full"
-                          />
-                          <div className="mt-1 flex justify-between text-xs text-muted-foreground">
-                            <span>Plus petit</span>
-                            <span>Meilleure qualité</span>
-                          </div>
-                        </div>
-                      )}
                     </div>
-                  )}
-                </div>
-              </div>
 
-              {/* Resize */}
-              <div className="rounded-lg border border-border bg-card">
-                <div className="p-4">
-                  <SectionHeader title="Redimensionnement" icon={Maximize} section="resize" />
-                  {expandedSections.resize && (
-                    <div className="mt-3 space-y-4">
-                      <div className="grid grid-cols-4 gap-2">
-                        {(["percentage", "dimensions", "width", "height"] as ResizeMode[]).map((mode) => (
+                    {(config.format === "jpeg" || config.format === "webp") && (
+                      <div>
+                        <div className="mb-2 flex items-center justify-between">
+                          <label className="text-xs font-medium text-muted-foreground">QUALITÉ</label>
+                          <span className="text-xs font-semibold">{config.quality}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="1"
+                          max="100"
+                          value={config.quality}
+                          onChange={(e) => setConfig((prev) => ({ ...prev, quality: parseInt(e.target.value) }))}
+                          className="w-full accent-primary"
+                        />
+                        <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
+                          <span>Petit fichier</span>
+                          <span>Haute qualité</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Transformations rapides */}
+                    <div>
+                      <label className="mb-2 block text-xs font-medium text-muted-foreground">ROTATION</label>
+                      <div className="flex gap-1.5">
+                        {([0, 90, 180, 270] as RotationAngle[]).map((angle) => (
                           <button
-                            key={mode}
-                            onClick={() => setConfig((prev) => ({ ...prev, resizeMode: mode }))}
-                            className={`rounded-lg border px-2 py-2 text-xs transition-colors ${
-                              config.resizeMode === mode
-                                ? "border-primary bg-primary/5 font-medium"
-                                : "border-border bg-background hover:bg-accent"
+                            key={angle}
+                            onClick={() => setConfig((prev) => ({ ...prev, rotation: angle }))}
+                            className={`flex-1 rounded-lg border py-2 text-xs font-medium transition-colors ${
+                              config.rotation === angle
+                                ? "border-primary bg-primary/10"
+                                : "border-border hover:bg-accent"
                             }`}
                           >
-                            {mode === "percentage" && "%"}
-                            {mode === "dimensions" && "L×H"}
-                            {mode === "width" && "L"}
-                            {mode === "height" && "H"}
+                            {angle}°
                           </button>
                         ))}
                       </div>
-
-                      {config.resizeMode === "percentage" && (
-                        <div>
-                          <label className="mb-2 flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">Pourcentage</span>
-                            <span className="font-medium">{config.percentage}%</span>
-                          </label>
-                          <input
-                            type="range"
-                            min="1"
-                            max="500"
-                            value={config.percentage}
-                            onChange={(e) =>
-                              setConfig((prev) => ({ ...prev, percentage: parseInt(e.target.value) }))
-                            }
-                            className="w-full"
-                          />
-                        </div>
-                      )}
-
-                      {(config.resizeMode === "dimensions" || config.resizeMode === "width") && (
-                        <div>
-                          <label className="mb-1 block text-xs text-muted-foreground">Largeur (px)</label>
-                          <input
-                            type="number"
-                            min="1"
-                            max="10000"
-                            value={config.width}
-                            onChange={(e) =>
-                              setConfig((prev) => ({ ...prev, width: parseInt(e.target.value) || 1 }))
-                            }
-                            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
-                          />
-                        </div>
-                      )}
-
-                      {(config.resizeMode === "dimensions" || config.resizeMode === "height") && (
-                        <div>
-                          <label className="mb-1 block text-xs text-muted-foreground">Hauteur (px)</label>
-                          <input
-                            type="number"
-                            min="1"
-                            max="10000"
-                            value={config.height}
-                            onChange={(e) =>
-                              setConfig((prev) => ({ ...prev, height: parseInt(e.target.value) || 1 }))
-                            }
-                            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
-                          />
-                        </div>
-                      )}
-
-                      {config.resizeMode !== "percentage" && (
-                        <label className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={config.maintainAspectRatio}
-                            onChange={(e) =>
-                              setConfig((prev) => ({ ...prev, maintainAspectRatio: e.target.checked }))
-                            }
-                            className="h-4 w-4 rounded border-border"
-                          />
-                          <span className="text-sm">Conserver les proportions</span>
-                        </label>
-                      )}
                     </div>
-                  )}
-                </div>
-              </div>
 
-              {/* Transform */}
-              <div className="rounded-lg border border-border bg-card">
-                <div className="p-4">
-                  <SectionHeader title="Transformation" icon={RotateCw} section="transform" />
-                  {expandedSections.transform && (
-                    <div className="mt-3 space-y-4">
-                      <div>
-                        <label className="mb-2 block text-xs text-muted-foreground">Rotation</label>
-                        <div className="flex gap-2">
-                          {([0, 90, 180, 270] as RotationAngle[]).map((angle) => (
-                            <button
-                              key={angle}
-                              onClick={() => setConfig((prev) => ({ ...prev, rotation: angle }))}
-                              className={`flex-1 rounded-lg border px-3 py-2 text-sm transition-colors ${
-                                config.rotation === angle
-                                  ? "border-primary bg-primary/5 font-medium"
-                                  : "border-border bg-background hover:bg-accent"
-                              }`}
-                            >
-                              {angle}°
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="mb-2 block text-xs text-muted-foreground">Retournement</label>
-                        <div className="flex gap-2">
-                          {([null, "horizontal", "vertical", "both"] as (FlipDirection | null)[]).map((flip) => (
-                            <button
-                              key={flip || "none"}
-                              onClick={() => setConfig((prev) => ({ ...prev, flip }))}
-                              className={`flex flex-1 items-center justify-center gap-1 rounded-lg border px-2 py-2 text-sm transition-colors ${
-                                config.flip === flip
-                                  ? "border-primary bg-primary/5 font-medium"
-                                  : "border-border bg-background hover:bg-accent"
-                              }`}
-                            >
-                              {flip === null && "Aucun"}
-                              {flip === "horizontal" && <FlipHorizontal className="h-4 w-4" />}
-                              {flip === "vertical" && <FlipVertical className="h-4 w-4" />}
-                              {flip === "both" && "↔↕"}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="mb-2 flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Coins arrondis</span>
-                          <span className="font-medium">{config.borderRadius}px</span>
-                        </label>
-                        <input
-                          type="range"
-                          min="0"
-                          max="200"
-                          value={config.borderRadius}
-                          onChange={(e) =>
-                            setConfig((prev) => ({ ...prev, borderRadius: parseInt(e.target.value) }))
-                          }
-                          className="w-full"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="mb-2 flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Padding</span>
-                          <span className="font-medium">{config.padding}px</span>
-                        </label>
-                        <input
-                          type="range"
-                          min="0"
-                          max="100"
-                          value={config.padding}
-                          onChange={(e) =>
-                            setConfig((prev) => ({ ...prev, padding: parseInt(e.target.value) }))
-                          }
-                          className="w-full"
-                        />
-                        {config.padding > 0 && (
-                          <div className="mt-2 flex items-center gap-2">
-                            <label className="text-xs text-muted-foreground">Couleur du padding</label>
-                            <input
-                              type="color"
-                              value={config.paddingColor}
-                              onChange={(e) =>
-                                setConfig((prev) => ({ ...prev, paddingColor: e.target.value }))
-                              }
-                              className="h-6 w-8 cursor-pointer rounded border border-border bg-background"
-                            />
-                          </div>
-                        )}
+                    <div>
+                      <label className="mb-2 block text-xs font-medium text-muted-foreground">RETOURNEMENT</label>
+                      <div className="flex gap-1.5">
+                        {([null, "horizontal", "vertical", "both"] as (FlipDirection | null)[]).map((flip) => (
+                          <button
+                            key={flip || "none"}
+                            onClick={() => setConfig((prev) => ({ ...prev, flip }))}
+                            className={`flex flex-1 items-center justify-center rounded-lg border py-2 transition-colors ${
+                              config.flip === flip
+                                ? "border-primary bg-primary/10"
+                                : "border-border hover:bg-accent"
+                            }`}
+                          >
+                            {flip === null && <RotateCw className="h-4 w-4 opacity-30" />}
+                            {flip === "horizontal" && <FlipHorizontal className="h-4 w-4" />}
+                            {flip === "vertical" && <FlipVertical className="h-4 w-4" />}
+                            {flip === "both" && <span className="text-xs">↔↕</span>}
+                          </button>
+                        ))}
                       </div>
                     </div>
-                  )}
-                </div>
-              </div>
+                  </div>
+                )}
 
-              {/* Filters */}
-              <div className="rounded-lg border border-border bg-card">
-                <div className="p-4">
-                  <SectionHeader title="Filtres" icon={Palette} section="filters" />
-                  {expandedSections.filters && (
-                    <div className="mt-3">
-                      <div className="grid grid-cols-3 gap-2">
+                {/* Tab Resize */}
+                {activeTab === "resize" && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="mb-2 block text-xs font-medium text-muted-foreground">MODE</label>
+                      <div className="grid grid-cols-2 gap-1.5">
                         {[
-                          { key: "grayscale", label: "Niveaux de gris" },
+                          { mode: "percentage" as ResizeMode, label: "Pourcentage" },
+                          { mode: "dimensions" as ResizeMode, label: "Dimensions" },
+                          { mode: "width" as ResizeMode, label: "Largeur" },
+                          { mode: "height" as ResizeMode, label: "Hauteur" },
+                        ].map(({ mode, label }) => (
+                          <button
+                            key={mode}
+                            onClick={() => setConfig((prev) => ({ ...prev, resizeMode: mode }))}
+                            className={`rounded-lg border py-2 text-xs font-medium transition-colors ${
+                              config.resizeMode === mode
+                                ? "border-primary bg-primary/10"
+                                : "border-border hover:bg-accent"
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {config.resizeMode === "percentage" && (
+                      <div>
+                        <div className="mb-2 flex items-center justify-between">
+                          <label className="text-xs font-medium text-muted-foreground">ÉCHELLE</label>
+                          <span className="text-xs font-semibold">{config.percentage}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="1"
+                          max="500"
+                          value={config.percentage}
+                          onChange={(e) => setConfig((prev) => ({ ...prev, percentage: parseInt(e.target.value) }))}
+                          className="w-full accent-primary"
+                        />
+                      </div>
+                    )}
+
+                    {(config.resizeMode === "dimensions" || config.resizeMode === "width") && (
+                      <div>
+                        <label className="mb-1.5 block text-xs font-medium text-muted-foreground">LARGEUR (PX)</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="10000"
+                          value={config.width}
+                          onChange={(e) => setConfig((prev) => ({ ...prev, width: parseInt(e.target.value) || 1 }))}
+                          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
+                        />
+                      </div>
+                    )}
+
+                    {(config.resizeMode === "dimensions" || config.resizeMode === "height") && (
+                      <div>
+                        <label className="mb-1.5 block text-xs font-medium text-muted-foreground">HAUTEUR (PX)</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="10000"
+                          value={config.height}
+                          onChange={(e) => setConfig((prev) => ({ ...prev, height: parseInt(e.target.value) || 1 }))}
+                          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
+                        />
+                      </div>
+                    )}
+
+                    {config.resizeMode !== "percentage" && (
+                      <label className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={config.maintainAspectRatio}
+                          onChange={(e) => setConfig((prev) => ({ ...prev, maintainAspectRatio: e.target.checked }))}
+                          className="h-4 w-4 rounded border-border accent-primary"
+                        />
+                        Conserver les proportions
+                      </label>
+                    )}
+
+                    <div>
+                      <div className="mb-2 flex items-center justify-between">
+                        <label className="text-xs font-medium text-muted-foreground">COINS ARRONDIS</label>
+                        <span className="text-xs font-semibold">{config.borderRadius}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="200"
+                        value={config.borderRadius}
+                        onChange={(e) => setConfig((prev) => ({ ...prev, borderRadius: parseInt(e.target.value) }))}
+                        className="w-full accent-primary"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="mb-2 flex items-center justify-between">
+                        <label className="text-xs font-medium text-muted-foreground">MARGE</label>
+                        <span className="text-xs font-semibold">{config.padding}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={config.padding}
+                        onChange={(e) => setConfig((prev) => ({ ...prev, padding: parseInt(e.target.value) }))}
+                        className="w-full accent-primary"
+                      />
+                      {config.padding > 0 && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">Couleur</span>
+                          <input
+                            type="color"
+                            value={config.paddingColor}
+                            onChange={(e) => setConfig((prev) => ({ ...prev, paddingColor: e.target.value }))}
+                            className="h-6 w-8 cursor-pointer rounded border border-border bg-background"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Tab Adjust (Effets) */}
+                {activeTab === "adjust" && (
+                  <div className="space-y-4">
+                    {/* Filtres rapides */}
+                    <div>
+                      <label className="mb-2 block text-xs font-medium text-muted-foreground">FILTRES</label>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {[
+                          { key: "grayscale", label: "N&B" },
                           { key: "sepia", label: "Sépia" },
                           { key: "invert", label: "Inverser" },
                         ].map(({ key, label }) => (
@@ -653,10 +661,10 @@ export default function ImageConverterPage() {
                                 [key]: !prev[key as keyof ImageConfig],
                               }))
                             }
-                            className={`rounded-lg border px-3 py-2 text-xs transition-colors ${
+                            className={`rounded-lg border py-2 text-xs font-medium transition-colors ${
                               config[key as keyof ImageConfig]
-                                ? "border-primary bg-primary/5 font-medium"
-                                : "border-border bg-background hover:bg-accent"
+                                ? "border-primary bg-primary/10"
+                                : "border-border hover:bg-accent"
                             }`}
                           >
                             {label}
@@ -664,162 +672,113 @@ export default function ImageConverterPage() {
                         ))}
                       </div>
                     </div>
-                  )}
-                </div>
-              </div>
 
-              {/* Adjustments */}
-              <div className="rounded-lg border border-border bg-card">
-                <div className="p-4">
-                  <SectionHeader title="Ajustements" icon={Settings} section="adjustments" />
-                  {expandedSections.adjustments && (
-                    <div className="mt-3 space-y-4">
-                      {[
-                        { key: "brightness", label: "Luminosité", min: 0, max: 200 },
-                        { key: "contrast", label: "Contraste", min: 0, max: 200 },
-                        { key: "saturation", label: "Saturation", min: 0, max: 200 },
-                        { key: "hue", label: "Teinte", min: 0, max: 360, suffix: "°" },
-                        { key: "blur", label: "Flou", min: 0, max: 20, suffix: "px" },
-                        { key: "opacity", label: "Opacité", min: 0, max: 100 },
-                      ].map(({ key, label, min, max, suffix = "%" }) => (
-                        <div key={key}>
-                          <label className="mb-2 flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">{label}</span>
-                            <span className="font-medium">
-                              {config[key as keyof ImageConfig]}
-                              {suffix}
-                            </span>
+                    {/* Ajustements avec icônes */}
+                    <div className="space-y-3">
+                      <div>
+                        <div className="mb-1.5 flex items-center justify-between">
+                          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <Sun className="h-3.5 w-3.5" /> Luminosité
                           </label>
-                          <input
-                            type="range"
-                            min={min}
-                            max={max}
-                            value={config[key as keyof ImageConfig] as number}
-                            onChange={(e) =>
-                              setConfig((prev) => ({
-                                ...prev,
-                                [key]: parseInt(e.target.value),
-                              }))
-                            }
-                            className="w-full"
-                          />
+                          <span className="text-xs font-semibold">{config.brightness}%</span>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Preview Panel */}
-            <div className="lg:sticky lg:top-8 lg:self-start">
-              <div className="rounded-lg border border-border bg-card p-4">
-                <div className="mb-4 flex items-center justify-between">
-                  <h2 className="text-sm font-medium">Aperçu</h2>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setZoom(Math.max(25, zoom - 25))}
-                      className="rounded border border-border bg-background p-1 text-muted-foreground hover:bg-accent"
-                    >
-                      <ZoomOut className="h-4 w-4" />
-                    </button>
-                    <span className="text-xs text-muted-foreground">{zoom}%</span>
-                    <button
-                      onClick={() => setZoom(Math.min(200, zoom + 25))}
-                      className="rounded border border-border bg-background p-1 text-muted-foreground hover:bg-accent"
-                    >
-                      <ZoomIn className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Preview Area */}
-                <div className="relative mb-4 overflow-auto rounded-lg border border-border bg-[repeating-conic-gradient(#80808010_0%_25%,transparent_0%_50%)] bg-[length:16px_16px]">
-                  <div
-                    className="flex min-h-[300px] items-center justify-center p-4"
-                    style={{ transform: `scale(${zoom / 100})`, transformOrigin: "center" }}
-                  >
-                    {previewUrl && (
-                      <img
-                        src={previewUrl}
-                        alt="Preview"
-                        className="max-w-full"
-                      />
-                    )}
-                    {isProcessing && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-background/50">
-                        <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+                        <input
+                          type="range"
+                          min="0"
+                          max="200"
+                          value={config.brightness}
+                          onChange={(e) => setConfig((prev) => ({ ...prev, brightness: parseInt(e.target.value) }))}
+                          className="w-full accent-primary"
+                        />
                       </div>
-                    )}
-                  </div>
-                </div>
 
-                {/* Output Info */}
-                {outputInfo && (
-                  <div className="mb-4 rounded-lg border border-border bg-background p-3 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Dimensions</span>
-                      <span className="font-medium">
-                        {outputInfo.width} × {outputInfo.height} px
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Taille estimée</span>
-                      <span className="font-medium">{formatFileSize(outputInfo.size)}</span>
-                    </div>
-                    {originalInfo && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Réduction</span>
-                        <span className={`font-medium ${outputInfo.size < originalInfo.size ? "text-green-600" : "text-red-600"}`}>
-                          {outputInfo.size < originalInfo.size ? "-" : "+"}
-                          {Math.abs(Math.round((1 - outputInfo.size / originalInfo.size) * 100))}%
-                        </span>
+                      <div>
+                        <div className="mb-1.5 flex items-center justify-between">
+                          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <Contrast className="h-3.5 w-3.5" /> Contraste
+                          </label>
+                          <span className="text-xs font-semibold">{config.contrast}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="200"
+                          value={config.contrast}
+                          onChange={(e) => setConfig((prev) => ({ ...prev, contrast: parseInt(e.target.value) }))}
+                          className="w-full accent-primary"
+                        />
                       </div>
-                    )}
+
+                      <div>
+                        <div className="mb-1.5 flex items-center justify-between">
+                          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <Droplets className="h-3.5 w-3.5" /> Saturation
+                          </label>
+                          <span className="text-xs font-semibold">{config.saturation}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="200"
+                          value={config.saturation}
+                          onChange={(e) => setConfig((prev) => ({ ...prev, saturation: parseInt(e.target.value) }))}
+                          className="w-full accent-primary"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="mb-1.5 flex items-center justify-between">
+                          <label className="text-xs text-muted-foreground">Teinte</label>
+                          <span className="text-xs font-semibold">{config.hue}°</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="360"
+                          value={config.hue}
+                          onChange={(e) => setConfig((prev) => ({ ...prev, hue: parseInt(e.target.value) }))}
+                          className="w-full accent-primary"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="mb-1.5 flex items-center justify-between">
+                          <label className="text-xs text-muted-foreground">Flou</label>
+                          <span className="text-xs font-semibold">{config.blur}px</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="20"
+                          value={config.blur}
+                          onChange={(e) => setConfig((prev) => ({ ...prev, blur: parseInt(e.target.value) }))}
+                          className="w-full accent-primary"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="mb-1.5 flex items-center justify-between">
+                          <label className="text-xs text-muted-foreground">Opacité</label>
+                          <span className="text-xs font-semibold">{config.opacity}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={config.opacity}
+                          onChange={(e) => setConfig((prev) => ({ ...prev, opacity: parseInt(e.target.value) }))}
+                          className="w-full accent-primary"
+                        />
+                      </div>
+                    </div>
                   </div>
                 )}
-
-                {/* Actions */}
-                <div className="space-y-2">
-                  <button
-                    onClick={handleDownload}
-                    disabled={!previewUrl}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:opacity-90 disabled:opacity-50"
-                  >
-                    <Download className="h-4 w-4" />
-                    Télécharger ({config.format.toUpperCase()})
-                  </button>
-                  <button
-                    onClick={handleCopyToClipboard}
-                    disabled={!previewUrl}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 py-2 text-sm transition-colors hover:bg-accent disabled:opacity-50"
-                  >
-                    {copied ? (
-                      <>
-                        <Check className="h-4 w-4 text-green-500" />
-                        Copié !
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="h-4 w-4" />
-                        Copier dans le presse-papier
-                      </>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 py-2 text-sm transition-colors hover:bg-accent"
-                  >
-                    <Upload className="h-4 w-4" />
-                    Changer d&apos;image
-                  </button>
-                </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Hidden canvas for processing */}
+        {/* Hidden elements */}
         <canvas ref={canvasRef} className="hidden" />
         <input
           ref={fileInputRef}

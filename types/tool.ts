@@ -15,6 +15,10 @@ export type ToolCategory =
   | "encoder"
   | "formatter"
   | "calculator"
+  | "security"
+  | "developer"
+  | "media"
+  | "productivity"
   | "other";
 
 export const categoryLabels: Record<ToolCategory, string> = {
@@ -23,5 +27,9 @@ export const categoryLabels: Record<ToolCategory, string> = {
   encoder: "Encodeurs",
   formatter: "Formateurs",
   calculator: "Calculateurs",
+  security: "Sécurité & Crypto",
+  developer: "Développement",
+  media: "Médias",
+  productivity: "Productivité",
   other: "Autres",
 };

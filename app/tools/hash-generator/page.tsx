@@ -185,12 +185,12 @@ const md5 = (str: string): string => {
   return (wordToHex(a) + wordToHex(b) + wordToHex(c) + wordToHex(d)).toLowerCase();
 };
 
-const algorithmInfo: Record<HashAlgorithm, { bits: number; secure: boolean; description: string }> = {
-  "MD5": { bits: 128, secure: false, description: "Obsolète - Ne pas utiliser pour la sécurité" },
-  "SHA-1": { bits: 160, secure: false, description: "Déprécié - Vulnérable aux collisions" },
-  "SHA-256": { bits: 256, secure: true, description: "Recommandé - Sécurisé pour la plupart des usages" },
-  "SHA-384": { bits: 384, secure: true, description: "Haute sécurité - Variante de SHA-512" },
-  "SHA-512": { bits: 512, secure: true, description: "Très haute sécurité - Le plus robuste" },
+const algorithmInfo: Record<HashAlgorithm, { bits: number; secure: boolean }> = {
+  "MD5": { bits: 128, secure: false },
+  "SHA-1": { bits: 160, secure: false },
+  "SHA-256": { bits: 256, secure: true },
+  "SHA-384": { bits: 384, secure: true },
+  "SHA-512": { bits: 512, secure: true },
 };
 
 export default function HashGeneratorPage() {
@@ -209,15 +209,11 @@ export default function HashGeneratorPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const computeHash = async (algorithm: HashAlgorithm, data: ArrayBuffer | string): Promise<string> => {
-    const start = performance.now();
-
     if (algorithm === "MD5") {
-      // MD5 uses string input
       const str = typeof data === "string" ? data : new TextDecoder().decode(data);
       return md5(str);
     }
 
-    // Use Web Crypto API for SHA algorithms
     const buffer = typeof data === "string" ? new TextEncoder().encode(data) : data;
     const hashBuffer = await crypto.subtle.digest(algorithm, buffer);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
@@ -243,12 +239,9 @@ export default function HashGeneratorPage() {
     setResults(newResults);
     setIsHashing(false);
 
-    // Verify hash if provided
     if (verifyHash.trim()) {
       const normalizedVerify = verifyHash.trim().toLowerCase();
-      const match = newResults.some(
-        (r) => r.hash.toLowerCase() === normalizedVerify
-      );
+      const match = newResults.some((r) => r.hash.toLowerCase() === normalizedVerify);
       setVerifyResult(match);
     }
   };
@@ -306,44 +299,39 @@ export default function HashGeneratorPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
+      {/* Header compact */}
       <header className="border-b border-border">
-        <div className="mx-auto max-w-6xl px-4 py-4">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <Link
             href="/"
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
-            Retour aux outils
+            <span className="hidden sm:inline">Retour</span>
           </Link>
+          <h1 className="text-lg font-semibold">Générateur de Hash</h1>
+          <div className="w-16" />
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">Générateur de Hash</h1>
-          <p className="mt-2 text-muted-foreground">
-            Calculez les empreintes MD5, SHA-1, SHA-256, SHA-384, SHA-512 de texte ou fichiers.
-          </p>
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-[1fr,400px]">
-          {/* Input Section */}
-          <div className="space-y-4">
-            {/* Mode Selection */}
-            <div className="flex items-center gap-4">
-              <div className="flex gap-1 rounded-lg border border-border bg-card p-1">
+      <main className="mx-auto max-w-7xl p-4">
+        <div className="flex h-[calc(100vh-88px)] flex-col gap-4 lg:flex-row">
+          {/* Zone principale - Input + Résultats */}
+          <div className="flex flex-1 flex-col rounded-lg border border-border bg-card">
+            {/* Toolbar */}
+            <div className="flex items-center gap-2 border-b border-border px-4 py-2">
+              <div className="flex gap-1 rounded-lg border border-border bg-background p-0.5">
                 <button
                   onClick={() => {
                     setInputMode("text");
                     setFileData(null);
                     setFileInfo(null);
                   }}
-                  className={`flex items-center gap-2 rounded px-4 py-2 text-sm transition-colors ${
+                  className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium transition-colors ${
                     inputMode === "text" ? "bg-primary text-primary-foreground" : "hover:bg-accent"
                   }`}
                 >
-                  <FileText className="h-4 w-4" />
+                  <FileText className="h-3.5 w-3.5" />
                   Texte
                 </button>
                 <button
@@ -351,42 +339,48 @@ export default function HashGeneratorPage() {
                     setInputMode("file");
                     setInput("");
                   }}
-                  className={`flex items-center gap-2 rounded px-4 py-2 text-sm transition-colors ${
+                  className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium transition-colors ${
                     inputMode === "file" ? "bg-primary text-primary-foreground" : "hover:bg-accent"
                   }`}
                 >
-                  <Upload className="h-4 w-4" />
+                  <Upload className="h-3.5 w-3.5" />
                   Fichier
                 </button>
               </div>
 
+              <div className="flex-1" />
+
+              <label className="flex items-center gap-1.5 text-xs">
+                <input
+                  type="checkbox"
+                  checked={uppercase}
+                  onChange={(e) => setUppercase(e.target.checked)}
+                  className="h-3.5 w-3.5 rounded border-border accent-primary"
+                />
+                Majuscules
+              </label>
+
               <button
                 onClick={handleClear}
-                className="flex items-center gap-1 rounded-lg border border-border bg-background px-3 py-2 text-sm transition-colors hover:bg-accent"
+                className="flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs hover:bg-accent"
               >
-                <Trash2 className="h-4 w-4" />
-                Effacer
+                <Trash2 className="h-3.5 w-3.5" />
               </button>
             </div>
 
-            {/* Input Area */}
-            <div className="rounded-lg border border-border bg-card">
+            {/* Zone d'input */}
+            <div className="flex-1 p-4">
               {inputMode === "text" ? (
-                <>
-                  <div className="border-b border-border px-4 py-2">
-                    <h2 className="text-sm font-medium">Texte à hasher</h2>
-                  </div>
-                  <textarea
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    placeholder="Entrez le texte à hasher..."
-                    className="h-48 w-full resize-none bg-transparent p-4 font-mono text-sm focus:outline-none"
-                    spellCheck={false}
-                  />
-                </>
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Entrez le texte à hasher..."
+                  className="h-full w-full resize-none bg-transparent font-mono text-sm focus:outline-none"
+                  spellCheck={false}
+                />
               ) : (
                 <div
-                  className="flex h-48 flex-col items-center justify-center gap-4 p-4"
+                  className="flex h-full flex-col items-center justify-center gap-4 rounded-lg border-2 border-dashed border-border"
                   onDrop={(e) => {
                     e.preventDefault();
                     const file = e.dataTransfer.files[0];
@@ -401,16 +395,14 @@ export default function HashGeneratorPage() {
                 >
                   {fileInfo ? (
                     <>
-                      <CheckCircle className="h-8 w-8 text-green-500" />
-                      <p className="font-medium">{fileInfo.name}</p>
+                      <CheckCircle className="h-12 w-12 text-green-500" />
+                      <p className="text-lg font-medium">{fileInfo.name}</p>
                       <p className="text-sm text-muted-foreground">{formatBytes(fileInfo.size)}</p>
                     </>
                   ) : (
                     <>
-                      <Upload className="h-8 w-8 text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground">
-                        Glissez un fichier ou cliquez pour sélectionner
-                      </p>
+                      <Upload className="h-12 w-12 text-muted-foreground" />
+                      <p className="text-muted-foreground">Glissez un fichier ou cliquez</p>
                     </>
                   )}
                   <input
@@ -421,137 +413,51 @@ export default function HashGeneratorPage() {
                   />
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+                    className="rounded-lg border border-primary bg-primary px-6 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
                   >
-                    {fileInfo ? "Changer de fichier" : "Sélectionner un fichier"}
+                    {fileInfo ? "Changer" : "Sélectionner"}
                   </button>
                 </div>
               )}
             </div>
 
-            {/* Algorithms Selection */}
-            <div className="rounded-lg border border-border bg-card p-4">
-              <h3 className="mb-3 text-sm font-medium">Algorithmes</h3>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-                {(Object.keys(algorithmInfo) as HashAlgorithm[]).map((algo) => (
-                  <button
-                    key={algo}
-                    onClick={() => toggleAlgorithm(algo)}
-                    className={`flex items-center justify-center gap-1 rounded-lg border px-3 py-2 text-sm transition-colors ${
-                      selectedAlgorithms.includes(algo)
-                        ? "border-primary bg-primary/5 font-medium"
-                        : "border-border bg-background hover:bg-accent"
-                    }`}
-                  >
-                    {!algorithmInfo[algo].secure && (
-                      <AlertTriangle className="h-3 w-3 text-orange-500" />
-                    )}
-                    {algo}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Verify Hash */}
-            <div className="rounded-lg border border-border bg-card p-4">
-              <h3 className="mb-3 text-sm font-medium">Vérifier un hash</h3>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={verifyHash}
-                  onChange={(e) => {
-                    setVerifyHash(e.target.value);
-                    setVerifyResult(null);
-                  }}
-                  placeholder="Collez un hash à vérifier..."
-                  className="flex-1 rounded-lg border border-border bg-background px-3 py-2 font-mono text-sm focus:border-primary focus:outline-none"
-                />
-                {verifyResult !== null && (
-                  <div
-                    className={`flex items-center gap-1 rounded-lg px-3 py-2 text-sm ${
-                      verifyResult
-                        ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
-                        : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
-                    }`}
-                  >
-                    {verifyResult ? (
-                      <>
-                        <CheckCircle className="h-4 w-4" />
-                        Match
-                      </>
-                    ) : (
-                      <>
-                        <XCircle className="h-4 w-4" />
-                        Non trouvé
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Options */}
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={uppercase}
-                  onChange={(e) => setUppercase(e.target.checked)}
-                  className="h-4 w-4 rounded border-border"
-                />
-                Majuscules
-              </label>
-            </div>
-          </div>
-
-          {/* Results Section */}
-          <div className="space-y-4">
-            <div className="rounded-lg border border-border bg-card p-4">
-              <div className="mb-4 flex items-center justify-between">
+            {/* Résultats */}
+            <div className="border-t border-border p-4">
+              <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-sm font-medium">Résultats</h2>
                 {isHashing && <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />}
               </div>
 
               {results.length > 0 ? (
-                <div className="space-y-4">
+                <div className="space-y-2">
                   {results.map((result) => {
                     const info = algorithmInfo[result.algorithm];
                     const displayHash = uppercase ? result.hash.toUpperCase() : result.hash;
 
                     return (
-                      <div key={result.algorithm} className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">{result.algorithm}</span>
-                            <span className="text-xs text-muted-foreground">({info.bits} bits)</span>
-                            {!info.secure && (
-                              <span className="rounded bg-orange-100 px-1.5 py-0.5 text-xs text-orange-700 dark:bg-orange-900 dark:text-orange-300">
-                                Non sécurisé
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-xs text-muted-foreground">
-                            {result.time.toFixed(2)} ms
-                          </span>
+                      <div key={result.algorithm} className="flex items-center gap-3 rounded-lg border border-border bg-background p-2">
+                        <div className="flex min-w-[80px] items-center gap-1.5">
+                          {!info.secure && <AlertTriangle className="h-3 w-3 text-orange-500" />}
+                          <span className="text-xs font-medium">{result.algorithm}</span>
+                          <span className="text-[10px] text-muted-foreground">({info.bits})</span>
                         </div>
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            value={displayHash}
-                            readOnly
-                            className="flex-1 rounded-lg border border-border bg-muted/30 px-3 py-2 font-mono text-xs focus:outline-none"
-                          />
-                          <button
-                            onClick={() => copyHash(result.hash, result.algorithm)}
-                            className="rounded-lg border border-border bg-background px-3 py-2 transition-colors hover:bg-accent"
-                          >
-                            {copied === result.algorithm ? (
-                              <Check className="h-4 w-4 text-green-500" />
-                            ) : (
-                              <Copy className="h-4 w-4" />
-                            )}
-                          </button>
-                        </div>
+                        <input
+                          type="text"
+                          value={displayHash}
+                          readOnly
+                          className="flex-1 bg-transparent font-mono text-xs focus:outline-none"
+                        />
+                        <span className="text-[10px] text-muted-foreground">{result.time.toFixed(1)}ms</span>
+                        <button
+                          onClick={() => copyHash(result.hash, result.algorithm)}
+                          className="rounded p-1.5 hover:bg-accent"
+                        >
+                          {copied === result.algorithm ? (
+                            <Check className="h-3.5 w-3.5 text-green-500" />
+                          ) : (
+                            <Copy className="h-3.5 w-3.5" />
+                          )}
+                        </button>
                       </div>
                     );
                   })}
@@ -562,60 +468,105 @@ export default function HashGeneratorPage() {
                 </p>
               )}
             </div>
+          </div>
 
-            {/* Algorithm Info */}
+          {/* Panneau de configuration */}
+          <div className="flex w-full flex-col gap-4 lg:w-72">
+            {/* Algorithmes */}
             <div className="rounded-lg border border-border bg-card p-4">
-              <h3 className="mb-3 flex items-center gap-2 text-sm font-medium">
-                <Shield className="h-4 w-4" />
-                Information sur les algorithmes
-              </h3>
-              <div className="space-y-3 text-sm">
-                {(Object.entries(algorithmInfo) as [HashAlgorithm, typeof algorithmInfo[HashAlgorithm]][]).map(
-                  ([algo, info]) => (
-                    <div key={algo} className="flex items-start gap-2">
-                      <span
-                        className={`mt-0.5 h-2 w-2 rounded-full ${
-                          info.secure ? "bg-green-500" : "bg-orange-500"
-                        }`}
-                      />
-                      <div>
-                        <p className="font-medium">{algo}</p>
-                        <p className="text-xs text-muted-foreground">{info.description}</p>
+              <h3 className="mb-3 text-xs font-medium text-muted-foreground">ALGORITHMES</h3>
+              <div className="space-y-1.5">
+                {(Object.keys(algorithmInfo) as HashAlgorithm[]).map((algo) => {
+                  const info = algorithmInfo[algo];
+                  return (
+                    <button
+                      key={algo}
+                      onClick={() => toggleAlgorithm(algo)}
+                      className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-sm transition-colors ${
+                        selectedAlgorithms.includes(algo)
+                          ? "border-primary bg-primary/10"
+                          : "border-border hover:bg-accent"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        {!info.secure && <AlertTriangle className="h-3 w-3 text-orange-500" />}
+                        <span className="font-medium">{algo}</span>
                       </div>
-                    </div>
-                  )
-                )}
+                      <span className="text-xs text-muted-foreground">{info.bits} bits</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Common Hashes */}
+            {/* Vérification */}
             <div className="rounded-lg border border-border bg-card p-4">
-              <h3 className="mb-3 text-sm font-medium">Tests rapides</h3>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => setInput("")}
-                  className="rounded border border-border bg-background px-3 py-1.5 text-xs hover:bg-accent"
-                >
-                  Vide
-                </button>
-                <button
-                  onClick={() => setInput("test")}
-                  className="rounded border border-border bg-background px-3 py-1.5 text-xs hover:bg-accent"
-                >
-                  test
-                </button>
-                <button
-                  onClick={() => setInput("Hello, World!")}
-                  className="rounded border border-border bg-background px-3 py-1.5 text-xs hover:bg-accent"
-                >
-                  Hello, World!
-                </button>
-                <button
-                  onClick={() => setInput("password123")}
-                  className="rounded border border-border bg-background px-3 py-1.5 text-xs hover:bg-accent"
-                >
-                  password123
-                </button>
+              <h3 className="mb-3 text-xs font-medium text-muted-foreground">VÉRIFIER UN HASH</h3>
+              <input
+                type="text"
+                value={verifyHash}
+                onChange={(e) => {
+                  setVerifyHash(e.target.value);
+                  setVerifyResult(null);
+                }}
+                placeholder="Collez un hash..."
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs focus:border-primary focus:outline-none"
+              />
+              {verifyResult !== null && (
+                <div className={`mt-2 flex items-center gap-2 rounded-lg px-3 py-2 text-xs ${
+                  verifyResult
+                    ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                    : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                }`}>
+                  {verifyResult ? (
+                    <>
+                      <CheckCircle className="h-3.5 w-3.5" />
+                      Correspondance trouvée
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="h-3.5 w-3.5" />
+                      Aucune correspondance
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Tests rapides */}
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h3 className="mb-3 text-xs font-medium text-muted-foreground">TESTS RAPIDES</h3>
+              <div className="flex flex-wrap gap-1.5">
+                {["", "test", "Hello, World!", "password123"].map((text, i) => (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      setInputMode("text");
+                      setInput(text);
+                    }}
+                    className="rounded border border-border bg-background px-2 py-1 text-xs hover:bg-accent"
+                  >
+                    {text || "Vide"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Info sécurité */}
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h3 className="mb-3 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <Shield className="h-3.5 w-3.5" />
+                SÉCURITÉ
+              </h3>
+              <div className="space-y-2 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-green-500" />
+                  <span>SHA-256/384/512 - Sécurisés</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-orange-500" />
+                  <span>MD5/SHA-1 - Non sécurisés</span>
+                </div>
               </div>
             </div>
           </div>
