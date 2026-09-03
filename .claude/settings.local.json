@@ -1,0 +1,43 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm add:*)",
+      "Bash(curl:*)",
+      "Bash(mkdir:*)",
+      "Bash(pnpm i)",
+      "Bash(pnpm build:*)",
+      "Bash(sudo ln:*)",
+      "Bash(sudo nginx:*)",
+      "Bash(sudo systemctl reload:*)",
+      "Bash(sudo certbot:*)",
+      "Bash(lsof:*)",
+      "Bash(pm2 start:*)",
+      "Bash(pm2 logs:*)",
+      "Bash(pm2 restart:*)",
+      "Bash(pm2 delete:*)",
+      "Bash(pm2 save:*)",
+      "Bash(tree:*)",
+      "Bash(cat:*)",
+      "Bash(python3:*)",
+      "Bash(rm:*)",
+      "Bash(pnpm --dir /root/productions/mytools build)",
+      "Bash(exec bash -c 'cd /root/productions/mytools && pnpm build 2>&1 | tail -40')",
+      "Bash(/bin/bash -c 'cd /root/productions/mytools && pnpm build')",
+      "Bash(pnpm --dir=/root/productions/mytools build)",
+      "Bash(pnpm --dir=/root/productions/mytools exec tsc:*)",
+      "Bash(while read hash)",
+      "Bash(do echo \"Downloading $hash...\" curl -sL -o \"$hash\" \"https://staticimgly.com/@imgly/background-removal-data/1.7.0/dist/$hash\" done)",
+      "Bash(chmod:*)",
+      "Bash(npx tsc:*)",
+      "Bash(apt-cache search:*)",
+      "Bash(sudo apt-get install:*)",
+      "Bash(qpdf:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nInitial commit: MyTools - 20 outils web client-side\n\nCollection complète d''outils web gratuits et respectueux de la vie privée:\n\nGénérateurs:\n- QR Code, Mot de passe, UUID, Lorem Ipsum, Hash, App Icons\n\nConvertisseurs:\n- Couleurs, Images, Vectorisateur, Suppresseur arrière-plan\n- Unités, Fichiers (PDF, DOCX, etc.)\n\nUtilitaires:\n- Déverrouilleurs Excel, ZIP, RAR, PDF\n- Base64 Encoder/Decoder\n- Formateur JSON, Transformateur de texte\n\nWorkspace:\n- Mindmap infini style Figma\n\nStack: Next.js 16, Tailwind CSS 4, shadcn/ui\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git commit:*)",
+      "Bash(node scripts/generate-icons.js:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
